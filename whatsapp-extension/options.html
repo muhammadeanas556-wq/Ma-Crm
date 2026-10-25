@@ -1,0 +1,7 @@
+<!doctype html><html><head><meta charset="utf-8"><title>MA CRM WhatsApp settings</title>
+<style>body{font:15px system-ui;max-width:650px;margin:48px auto;padding:0 20px;line-height:1.55}label{display:block;margin:16px 0 5px}input{width:100%;padding:10px;box-sizing:border-box}button{margin:20px 0;padding:12px 24px}small{display:block;color:#555}#status{font-weight:bold}</style></head><body>
+<h2>MA CRM WhatsApp extension settings</h2><p>Configure this extension privately in Chrome. Do not upload the bridge token to GitHub.</p>
+<label>CRM website origin (e.g. https://your-crm.example.com)</label><input id="url" type="url" placeholder="https://your-site.example.com">
+<label>WA_BRIDGE_TOKEN from your hosting environment</label><input id="token" type="password" autocomplete="off" placeholder="At least 32 random characters">
+<small>The CRM website must use HTTPS for online deployment. Set the same token in hosting environment variables.</small>
+<button id="save">Save extension settings</button><p id="status"></p><script src="options.js"></script></body></html>

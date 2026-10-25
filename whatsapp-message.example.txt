@@ -1,0 +1,11 @@
+Hello [Customer Name],
+
+Your order [Order ID] has been dispatched successfully.
+
+Tracking ID: [Tracking ID]
+Order: [Order Details]
+Total: Rs. [Amount]
+
+Your order will be delivered to you within 1–2 working days.
+
+Thank you for shopping with us.
