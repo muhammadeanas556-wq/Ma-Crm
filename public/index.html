@@ -1428,179 +1428,6 @@ body {
   .btn,.btn-sm,button{min-height:40px}
   input,select,textarea{font-size:16px!important}
 }
-
-/* ══════════════════════════════════════════
-   STAFF ACCESS (permissions, tags, staff dashboard, Staff Orders)
-══════════════════════════════════════════ */
-.perm-box { border:1px solid var(--border); border-radius:var(--r-md); background:var(--bg3); padding:12px 14px; margin-bottom:18px; }
-.perm-title { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; font-size:13px; font-weight:700; color:var(--white); margin-bottom:6px; }
-.perm-quick { display:flex; gap:6px; }
-.perm-quick button { background:none; border:1px solid var(--border); color:var(--muted); border-radius:6px; padding:4px 10px; font:600 11px var(--font); cursor:pointer; }
-.perm-quick button:hover { color:var(--text); border-color:rgba(255,255,255,.15); }
-.perm-group { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); font-family:var(--mono); margin:10px 0 2px; }
-.perm-item { display:flex; align-items:flex-start; gap:10px; padding:7px 4px; border-radius:6px; cursor:pointer; min-height:44px; }
-.perm-item:hover { background:rgba(255,255,255,.03); }
-.perm-item input { width:18px; height:18px; min-height:0 !important; accent-color:var(--accent); margin-top:2px; flex-shrink:0; cursor:pointer; }
-.perm-item b { display:block; font-size:13px; font-weight:600; color:var(--text); }
-.perm-item small { display:block; font-size:11px; color:var(--muted); line-height:1.4; }
-.perm-locked { display:grid; grid-template-columns:1fr 1fr; gap:0 10px; }
-.perm-item.locked { cursor:not-allowed; opacity:.55; min-height:36px; }
-.perm-item.locked input { cursor:not-allowed; }
-.perm-chips { display:flex; flex-wrap:wrap; gap:4px; margin-top:5px; }
-.perm-chip { font-size:10px; font-weight:700; padding:2px 7px; border-radius:12px; background:var(--accent-dim); color:var(--accent2); border:1px solid rgba(59,130,246,.2); font-family:var(--mono); white-space:nowrap; }
-.perm-chip.none { background:var(--red-dim); color:var(--red); border-color:rgba(239,68,68,.2); }
-
-.tc-tags { display:flex; flex-wrap:wrap; gap:4px; margin-top:5px; }
-.tag-chip { display:inline-flex; align-items:center; font-size:11px; font-weight:700; padding:2px 8px; border-radius:20px; background:var(--cyan-dim); color:var(--cyan); border:1px solid rgba(6,182,212,.25); white-space:nowrap; font-family:var(--font); line-height:1.5; }
-.tag-suggest { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
-.tag-suggest button { background:var(--bg3); border:1px solid var(--border); color:var(--muted); border-radius:20px; padding:5px 12px; font:600 12px var(--font); cursor:pointer; }
-.tag-suggest button:hover { color:var(--cyan); border-color:rgba(6,182,212,.35); }
-
-.sopt.sx .dot { background:#94a3b8; } .sopt.sx { color:#94a3b8; }
-.sopt-sub { margin-left:auto; font-size:11px; font-weight:600; opacity:.7; font-family:var(--mono); }
-.sopt.is-hidden { display:none; }
-
-.staff-acts { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
-.tbl-staff { grid-template-columns: 36px 190px 200px 150px 200px 170px 190px 160px; }
-
-.staff-quickbar { display:flex; flex-wrap:wrap; align-items:center; gap:12px; background:var(--bg2); border:1px solid var(--border); border-radius:var(--r-lg); padding:14px 16px; margin-bottom:16px; }
-.sq-hello { flex:1 1 220px; min-width:0; }
-.sq-hello b { display:block; font-size:17px; color:var(--white); }
-.sq-hello span { font-size:12px; color:var(--muted); font-family:var(--mono); }
-.sq-actions { display:flex; flex-wrap:wrap; gap:8px; }
-.sq-btn { min-height:44px; padding:10px 16px; border-radius:var(--r-md); border:1px solid var(--border); background:var(--bg3); color:var(--text); font:700 13px var(--font); cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
-.sq-btn:hover { border-color:rgba(255,255,255,.15); }
-.sq-btn.new { background:var(--green); color:#0a0f1a; border-color:transparent; }
-.sq-btn b { font-family:var(--mono); color:var(--white); }
-.staff-noperm { text-align:center; padding:40px 20px !important; color:var(--muted); }
-.staff-noperm span { font-size:34px; display:block; margin-bottom:10px; }
-.staff-noperm p { font-size:14px; line-height:1.7; }
-
-/* Staff Orders page */
-.so-filters { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; }
-.so-filters .fg { flex:1 1 170px; min-width:0; }
-.so-quick { display:flex; flex-wrap:wrap; gap:8px; }
-.so-quick .btn { padding:10px 14px; font-size:12px; min-height:42px; }
-.so-stats { display:grid; grid-template-columns:repeat(6,1fr); gap:14px; margin-bottom:16px; }
-.rpt-sc-slate { background:linear-gradient(135deg,#64748b,#334155); }
-.so-staff-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:12px; }
-.so-staff-card { width:100%; text-align:left; background:var(--bg3); border:1px solid var(--border); border-radius:var(--r-lg); padding:14px; cursor:pointer; color:var(--text); font-family:var(--font); transition:border-color .15s, background .15s; }
-.so-staff-card:hover { border-color:rgba(255,255,255,.15); }
-.so-staff-card.sel { border-color:var(--accent); background:var(--accent-dim); }
-.so-staff-head { display:flex; align-items:center; gap:10px; margin-bottom:12px; min-width:0; }
-.so-staff-name { font-size:15px; font-weight:700; color:var(--white); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.so-staff-sub { font-size:11px; color:var(--muted); font-family:var(--mono); }
-.so-staff-nums { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
-.so-num { background:var(--bg2); border-radius:8px; padding:6px 8px; }
-.so-num b { display:block; font-size:18px; color:var(--white); font-family:var(--mono); line-height:1.2; }
-.so-num span { font-size:11px; color:var(--muted); }
-.so-num.p b { color:var(--yellow); } .so-num.k b { color:var(--green); } .so-num.r b { color:var(--red); } .so-num.c b { color:var(--purple); } .so-num.x b { color:#94a3b8; }
-.so-table-wrap { overflow-x:auto; }
-.so-table { width:100%; border-collapse:collapse; font-size:14px; }
-.so-table th { text-align:left; padding:10px 14px; font-size:11px; letter-spacing:.06em; color:var(--muted); text-transform:uppercase; font-family:var(--mono); background:var(--bg3); white-space:nowrap; }
-.so-table td { padding:12px 14px; border-top:1px solid var(--border); vertical-align:middle; color:var(--text); }
-.so-table .so-code { font-family:var(--mono); color:var(--accent2); white-space:nowrap; }
-.so-table .so-cust b { display:block; color:var(--white); font-weight:600; }
-.so-table .so-cust small { color:var(--muted); font-family:var(--mono); font-size:12px; }
-.so-table .so-amt { font-family:var(--mono); color:var(--accent2); font-weight:600; white-space:nowrap; }
-.so-table .so-tags { margin:0; }
-.so-table .badge { cursor:default; font-size:12px; padding:4px 10px; }
-.pay-pill { display:inline-block; font-size:11px; font-weight:700; padding:3px 9px; border-radius:20px; border:1px solid; white-space:nowrap; }
-.pay-Paid { color:var(--green); background:var(--green-dim); border-color:rgba(34,197,94,.25); }
-.pay-Partial { color:var(--yellow); background:var(--yellow-dim); border-color:rgba(245,158,11,.25); }
-.pay-Unpaid { color:var(--muted); background:var(--bg3); border-color:var(--border); }
-.so-via { display:block; font-size:11px; color:var(--muted); font-family:var(--mono); }
-.so-act-row { display:flex; flex-wrap:wrap; gap:4px 12px; align-items:baseline; padding:10px 20px; border-top:1px solid var(--border); font-size:13px; }
-.so-act-row:first-child { border-top:0; }
-.so-act-row time { font-family:var(--mono); font-size:11px; color:var(--muted); min-width:120px; }
-.so-act-row b { color:var(--white); }
-
-/* ── Responsive: modals never get cut off on small screens ── */
-.overlay { overflow-y:auto; padding:16px; }
-.overlay .modal { margin:auto; }
-
-@media (max-width:1400px) { .so-stats { grid-template-columns:repeat(3,1fr); } }
-@media (max-width:900px) {
-  #page-team > div[style*="grid-template-columns"],
-  #page-demoaccount > div[style*="grid-template-columns"] { grid-template-columns:1fr !important; }
-}
-@media (max-width:760px) {
-  /* Order lists become stacked cards — no sideways scrolling on phones */
-  .tbl-scroll-wrap { overflow-x:visible; }
-  .tbl-head { display:none !important; }
-  .tbl-head, .tbl-row, #list-header-row, #list-body, #dash-list-header-row, #dash-list-body { min-width:0 !important; }
-  .tbl-row { display:flex !important; flex-wrap:wrap; align-items:center; gap:8px 12px; padding:14px 14px !important; min-height:0; position:relative; }
-  .tbl-row > * { min-width:0; }
-  .tbl-row .hide-sm, .tbl-row .hide-md { display:block !important; }
-  .tbl-row .tc-num { position:absolute; top:12px; right:14px; font-size:12px; }
-  .tbl-row .tc-name { order:1; flex:1 1 100%; font-size:18px; white-space:normal; padding-right:34px; }
-  .tbl-row .tc-track { order:2; flex:1 1 100%; padding-right:0; }
-  .tbl-row .tc-phone { order:3; flex:1 1 100%; font-size:14px; }
-  .tbl-row .tc-detail { order:4; flex:1 1 100%; font-size:14px; white-space:normal; color:var(--muted); }
-  .tbl-row .tc-amount { order:5; font-size:17px; }
-  .tbl-row .tc-pend { order:6; }
-  .tbl-row .tc-pend span { font-size:14px; }
-  .tbl-row .tc-pend span::before { content:'Pending: '; color:var(--muted); font-weight:400; }
-  .tbl-row .tc-stat, .tbl-row .tc-status-cell { order:7; }
-  .tbl-row .tc-actions, .tbl-row .staff-acts { order:8; }
-  .tbl-row .tc-actions:first-of-type, .tbl-row .tc-act-first { margin-left:auto; }
-  .tbl-row .staff-acts { flex:1 1 100%; justify-content:flex-end; }
-  .tbl-act { width:44px; height:44px; font-size:16px; }
-  .tc-track-copy { padding:8px 12px; }
-  .badge { padding:9px 14px; }
-  .tc-wa { padding:6px 10px; font-size:11px; }
-  .tc-ss-btn { min-width:40px; min-height:36px !important; }
-
-  /* Monthly report table → cards */
-  #report-list-header { display:none !important; }
-  #report-list-body > div { display:flex !important; flex-wrap:wrap; gap:6px 12px; padding:12px 14px !important; }
-  #report-list-body > div > * { white-space:normal !important; }
-  #report-list-body .col-name { flex:1 1 100%; }
-
-  .card-head { flex-wrap:wrap; }
-  .card-head > div:last-child { flex-wrap:wrap; }
-  .toolbar .filter-tabs { flex-wrap:wrap; width:100%; }
-  .toolbar .ftab { flex:1 0 auto; padding:10px 12px; }
-  .month-select, .year-select { min-height:42px; }
-
-  .team-table-head { display:none !important; }
-  .team-row { display:flex !important; flex-wrap:wrap; gap:8px 12px; }
-  .team-row > div:nth-child(2) { flex:1 1 0; min-width:0; }
-  .team-row .team-email { flex:1 1 100%; order:5; word-break:break-all; }
-  .team-row .act-btn { min-height:40px; padding:8px 12px; }
-
-  /* Staff Orders: table → cards */
-  .so-table thead { display:none; }
-  .so-table, .so-table tbody, .so-table tr, .so-table td { display:block; width:100%; }
-  .so-table tr { border-top:1px solid var(--border); padding:10px 14px; }
-  .so-table td { border:0; padding:5px 0; display:flex; justify-content:space-between; align-items:center; gap:12px; text-align:right; }
-  .so-table td::before { content:attr(data-label); color:var(--muted); font-size:12px; font-family:var(--mono); text-align:left; flex-shrink:0; }
-  .so-table .so-cust { display:block; text-align:left; }
-  .so-table .so-tags { justify-content:flex-end; }
-  .so-table .so-cust::before { display:none; }
-  .so-act-row { padding:10px 14px; }
-  .so-act-row time { min-width:0; flex:1 1 100%; }
-}
-@media (max-width:640px) {
-  .topbar { padding:0 14px; gap:10px; }
-  .tb-left { min-width:0; }
-  .tb-left h1 { font-size:19px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .tb-left p { font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .tb-date, .tb-profile-info, .tb-profile-chevron { display:none; }
-  .tb-right { gap:8px; }
-  .hamburger { min-width:44px; min-height:44px; align-items:center; justify-content:center; }
-  .overlay { padding:10px; }
-  .overlay .modal { padding:20px 16px; }
-  .form-actions { flex-wrap:wrap; }
-  .form-actions .btn { flex:1 1 auto; justify-content:center; min-height:46px; }
-  .so-stats { grid-template-columns:repeat(2,1fr); gap:10px; }
-  .so-stats .rpt-sc { padding:14px 12px 12px; }
-  .so-stats .rpt-sc-val { font-size:28px; }
-  .perm-locked { grid-template-columns:1fr; }
-  .stats-row .rpt-sc-val { font-size:32px; }
-  .sq-actions { width:100%; }
-  .sq-btn { flex:1 1 auto; justify-content:center; }
-}
 </style>
 </head>
 <body>
@@ -1688,7 +1515,7 @@ body {
 <div class="sb-overlay" id="sbOverlay" onclick="closeSidebar()"></div>
 
 <aside class="sidebar" id="sidebar">
-  <div class="sb-logo" onclick="if(role==='admin')document.getElementById('crm-logo-input').click()" title="Click to change CRM logo" style="cursor:pointer;position:relative" onmouseenter="document.getElementById('sb-logo-cam').style.opacity='1'" onmouseleave="document.getElementById('sb-logo-cam').style.opacity='0'">
+  <div class="sb-logo" onclick="document.getElementById('crm-logo-input').click()" title="Click to change CRM logo" style="cursor:pointer;position:relative" onmouseenter="document.getElementById('sb-logo-cam').style.opacity='1'" onmouseleave="document.getElementById('sb-logo-cam').style.opacity='0'">
     <div class="sb-logo-mark" id="sb-logo-mark" style="position:relative;overflow:hidden;flex-shrink:0">
       <span id="sb-logo-text">MA</span>
       <img id="sb-logo-img" src="" style="display:none;width:100%;height:100%;object-fit:cover;position:absolute;inset:0;border-radius:7px"/>
@@ -1717,9 +1544,6 @@ body {
     </div>
     <div class="sb-item" id="nav-team" onclick="showPage('team',this)" style="display:none">
       <span class="ic">👥</span>Team
-    </div>
-    <div class="sb-item" id="nav-stafforders" onclick="showPage('stafforders',this)" style="display:none">
-      <span class="ic">🧾</span>Staff Orders
     </div>
     <div class="sb-item" id="nav-settings" onclick="showPage('team',this)" style="display:none">
       <span class="ic">⚙️</span>Settings
@@ -1778,7 +1602,7 @@ body {
         </div>
         <div class="tb-profile-chevron">▾</div>
         <div class="profile-dropdown" id="profileDropdown">
-          <div class="pd-item" id="pd-my-profile" onclick="event.stopPropagation();closeProfileDropdown();showPage('team',document.getElementById('nav-team'))">👤 My Profile</div>
+          <div class="pd-item" onclick="event.stopPropagation();closeProfileDropdown();showPage('team',document.getElementById('nav-team'))">👤 My Profile</div>
           <div class="pd-item danger" onclick="event.stopPropagation();closeProfileDropdown();doLogout()">⏻ Sign Out</div>
         </div>
       </div>
@@ -1792,15 +1616,7 @@ body {
 
     <!-- ── PAGE 1: DASHBOARD ── -->
     <div class="page active" id="page-dashboard">
-      <!-- Staff-only quick bar (rendered by renderStaffQuickbar) -->
-      <div class="staff-quickbar" id="staff-quickbar" style="display:none"></div>
-      <div class="card" id="dash-noperm" style="display:none">
-        <div class="card-body staff-noperm">
-          <span>🔒</span>
-          <p>Aap ko abhi orders dekhne ki permission nahi di gayi.<br>Admin se rabta karein.</p>
-        </div>
-      </div>
-      <div class="stats-row" id="dash-stats-row">
+      <div class="stats-row">
 
         <!-- Card 1: This Month Orders — Teal -->
         <div class="rpt-sc rpt-sc-teal">
@@ -1845,7 +1661,7 @@ body {
       </div>
 
       <!-- Dashboard Table Card -->
-      <div class="card dash-table-wrap" id="dash-table-card">
+      <div class="card dash-table-wrap">
         <div class="card-head">
           <div class="card-head-left">
             <h3>Clients &amp; Orders</h3>
@@ -1957,7 +1773,7 @@ body {
                 <option value="Return">Return</option>
               </select>
             </div>
-            <div class="fg" id="f-assign-wrap">
+            <div class="fg">
               <label>Assign To Staff</label>
               <select id="f-assign">
                 <option value="">— Admin (Default) —</option>
@@ -1966,10 +1782,6 @@ body {
             <div class="fg full">
               <label>Tracking ID <span style="color:var(--muted);font-weight:400;font-size:11px">(Optional — courier / waybill number)</span></label>
               <input type="text" id="f-tracking" placeholder="e.g. TCS-1234567890, LP-9876543210"/>
-            </div>
-            <div class="fg full" id="f-tags-wrap">
-              <label for="f-tags">Order Tags <span style="color:var(--muted);font-weight:400;font-size:11px">(Optional — comma se alag karein, e.g. Urgent, COD)</span></label>
-              <input type="text" id="f-tags" maxlength="200" placeholder="e.g. Urgent, COD, Lahore" autocomplete="off"/>
             </div>
           </div>
 
@@ -2088,7 +1900,7 @@ body {
         <div class="card-body" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:16px 20px">
           <!-- Business Logo -->
           <div style="position:relative;flex-shrink:0">
-            <div id="report-logo-wrap" onclick="if(role==='admin')document.getElementById('report-logo-input').click()"
+            <div id="report-logo-wrap" onclick="document.getElementById('report-logo-input').click()"
                  style="width:64px;height:64px;border-radius:10px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff;font-family:var(--mono);cursor:pointer;border:2px solid var(--border2);overflow:hidden;position:relative"
                  title="Click to upload business logo"
                  onmouseenter="document.getElementById('report-logo-cam').style.opacity='1'"
@@ -2220,12 +2032,7 @@ body {
           </div>
         </div>
 
-        <!-- Section: My Profile (card header restored — its missing opening tags pushed
-             Product + Staff Management out of the Team page onto every page) -->
         <div class="card">
-          <div class="card-head">
-            <div class="card-head-left">
-              <h3>👤 My Profile</h3>
               <p>Apni info update karein</p>
             </div>
           </div>
@@ -2311,86 +2118,6 @@ body {
           </div>
         </div>
 
-      </div>
-    </div>
-
-    <!-- ═══ STAFF ORDERS (Admin-only) — numbers come from /api/staff-orders ═══ -->
-    <div class="page" id="page-stafforders">
-      <div class="card">
-        <div class="card-body so-filters">
-          <div class="fg">
-            <label for="so-staff">Staff Member</label>
-            <select id="so-staff" onchange="soSetStaff(this.value)"><option value="">All staff</option></select>
-          </div>
-          <div class="fg">
-            <label for="so-from">From</label>
-            <input type="date" id="so-from" onchange="loadStaffOrders()"/>
-          </div>
-          <div class="fg">
-            <label for="so-to">To</label>
-            <input type="date" id="so-to" onchange="loadStaffOrders()"/>
-          </div>
-          <div class="so-quick">
-            <button type="button" class="btn btn-outline" onclick="soQuickRange('month')">This month</button>
-            <button type="button" class="btn btn-outline" onclick="soQuickRange('today')">Today</button>
-            <button type="button" class="btn btn-outline" onclick="soQuickRange('all')">All time</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="so-stats" id="so-stats">
-        <div class="rpt-sc rpt-sc-teal"><div class="rpt-sc-orb"></div><div class="rpt-sc-lbl">Total Staff Orders</div><div class="rpt-sc-val" id="so-total">0</div><div class="rpt-sc-sub" id="so-total-sub">—</div></div>
-        <div class="rpt-sc rpt-sc-orange"><div class="rpt-sc-orb"></div><div class="rpt-sc-lbl">Pending</div><div class="rpt-sc-val" id="so-pending">0</div><div class="rpt-sc-sub">Processing</div></div>
-        <div class="rpt-sc rpt-sc-green"><div class="rpt-sc-orb"></div><div class="rpt-sc-lbl">Paid</div><div class="rpt-sc-val" id="so-paid">0</div><div class="rpt-sc-sub" id="so-paid-sub">—</div></div>
-        <div class="rpt-sc rpt-sc-red"><div class="rpt-sc-orb"></div><div class="rpt-sc-lbl">Returned</div><div class="rpt-sc-val" id="so-returned">0</div><div class="rpt-sc-sub">Return</div></div>
-        <div class="rpt-sc rpt-sc-purple"><div class="rpt-sc-orb"></div><div class="rpt-sc-lbl">Completed</div><div class="rpt-sc-val" id="so-completed">0</div><div class="rpt-sc-sub">Delivered</div></div>
-        <div class="rpt-sc rpt-sc-slate"><div class="rpt-sc-orb"></div><div class="rpt-sc-lbl">Cancelled</div><div class="rpt-sc-val" id="so-cancelled">0</div><div class="rpt-sc-sub">Cancelled</div></div>
-      </div>
-
-      <div class="card">
-        <div class="card-head">
-          <div class="card-head-left">
-            <h3>Orders by Staff Member</h3>
-            <p>Card par click karein — us staff ke orders neeche dikhenge</p>
-          </div>
-        </div>
-        <div class="card-body"><div class="so-staff-grid" id="so-staff-grid"></div></div>
-      </div>
-
-      <div class="card">
-        <div class="card-head">
-          <div class="card-head-left">
-            <h3 id="so-list-title">All Staff Orders</h3>
-            <p id="so-list-count">0 orders</p>
-          </div>
-        </div>
-        <div class="toolbar">
-          <div class="filter-tabs so-tabs" id="so-tabs">
-            <button class="ftab active" data-st="" onclick="soSetStatus('')">All</button>
-            <button class="ftab" data-st="pending" onclick="soSetStatus('pending')">Pending</button>
-            <button class="ftab" data-st="paid" onclick="soSetStatus('paid')">Paid</button>
-            <button class="ftab" data-st="returned" onclick="soSetStatus('returned')">Returned</button>
-            <button class="ftab" data-st="completed" onclick="soSetStatus('completed')">Completed</button>
-            <button class="ftab" data-st="cancelled" onclick="soSetStatus('cancelled')">Cancelled</button>
-          </div>
-        </div>
-        <div class="so-table-wrap">
-          <table class="so-table">
-            <thead><tr><th>Order ID</th><th>Customer</th><th>Order Date</th><th>Status</th><th>Payment</th><th>Tags</th><th>Total</th><th>Return</th><th>Handled By</th></tr></thead>
-            <tbody id="so-list-body"></tbody>
-          </table>
-        </div>
-        <div class="empty" id="so-list-empty" style="display:none"><span>🧾</span><p>Is filter mein koi staff order nahi.</p></div>
-      </div>
-
-      <div class="card">
-        <div class="card-head">
-          <div class="card-head-left">
-            <h3>Recent Staff Activity</h3>
-            <p>Kis staff ne kaunsa order banaya / edit kiya / status badla</p>
-          </div>
-        </div>
-        <div id="so-activity"></div>
       </div>
     </div>
 
@@ -2485,7 +2212,6 @@ body {
       <div class="fg"><label>Password</label><input type="text" id="staff-pass" placeholder="Default: employee"/></div>
       <div class="fg"><label>Role</label><input type="text" value="Staff" disabled style="opacity:.5;cursor:not-allowed"/></div>
     </div>
-    <div class="perm-box" id="add-staff-perms"></div>
     <div class="form-actions">
       <button class="btn btn-green" onclick="saveNewStaff()">Save Staff</button>
       <button class="btn btn-outline" onclick="closeAddStaffModal()">Cancel</button>
@@ -2515,7 +2241,6 @@ body {
       </div>
       <div class="fg"><label>New Password (khali chhoren agar na badalna ho)</label><input type="text" id="edit-staff-pass" placeholder="Naya password likhein"/></div>
     </div>
-    <div class="perm-box" id="edit-staff-perms"></div>
     <div class="form-actions">
       <button class="btn btn-blue" onclick="saveEditStaff()">Update</button>
       <button class="btn btn-outline" onclick="closeEditStaffModal()">Cancel</button>
@@ -2540,32 +2265,12 @@ body {
   <div class="modal">
     <h3>Update Order Status</h3>
     <div class="status-opts">
-      <div class="sopt sp" data-status="Processing" onclick="selectS('Processing')"><div class="dot"></div>Processing <span class="sopt-sub">Pending</span></div>
-      <div class="sopt sk" data-status="Paid" onclick="selectS('Paid')"><div class="dot"></div>Paid</div>
-      <div class="sopt sc" data-status="Return" onclick="selectS('Return')"><div class="dot"></div>Return</div>
-      <div class="sopt sd" data-status="Delivered" onclick="selectS('Delivered')"><div class="dot"></div>Delivered <span class="sopt-sub">Completed</span></div>
-      <div class="sopt sx" data-status="Cancelled" onclick="selectS('Cancelled')"><div class="dot"></div>Cancelled</div>
+      <div class="sopt sp" onclick="selectS('Processing')"><div class="dot"></div>Processing</div>
+      <div class="sopt sk" onclick="selectS('Paid')"><div class="dot"></div>Paid</div>
+      <div class="sopt sc" onclick="selectS('Return')"><div class="dot"></div>Return</div>
     </div>
     <div class="form-actions">
       <button class="btn btn-blue" onclick="confirmStatus()">Update</button>
-      <button class="btn btn-outline" onclick="closeStatusModal()">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<!-- ORDER TAGS MODAL -->
-<div class="overlay" id="tagsModal">
-  <div class="modal">
-    <h3>🏷️ Order Tags</h3>
-    <p id="tags-modal-sub" style="margin-bottom:12px">—</p>
-    <div class="fg" style="margin-bottom:10px">
-      <label for="tags-modal-input">Tags (comma se alag karein)</label>
-      <input type="text" id="tags-modal-input" maxlength="200" placeholder="e.g. Urgent, COD" autocomplete="off" onkeydown="if(event.key==='Enter')saveTagsModal()"/>
-    </div>
-    <div class="tag-suggest" id="tags-modal-suggest"></div>
-    <div class="form-actions">
-      <button class="btn btn-blue" id="tags-modal-save" onclick="saveTagsModal()">Save Tags</button>
-      <button class="btn btn-outline" onclick="closeTagsModal()">Cancel</button>
     </div>
   </div>
 </div>
@@ -2651,11 +2356,9 @@ body {
           <option value="Processing">Processing</option>
           <option value="Paid">Paid</option>
           <option value="Return">Return</option>
-          <option value="Delivered">Delivered</option>
-          <option value="Cancelled">Cancelled</option>
         </select>
       </div>
-      <div class="fg" id="edit-f-assign-wrap">
+      <div class="fg">
         <label>Assign To Staff</label>
         <select id="edit-f-assign"></select>
       </div>
@@ -2663,14 +2366,9 @@ body {
         <label>Tracking ID <span style="color:var(--muted);font-weight:400;font-size:11px">(Optional)</span></label>
         <input type="text" id="edit-f-tracking" placeholder="e.g. TCS-1234567890"/>
       </div>
-      <div class="fg full" id="edit-f-tags-wrap">
-        <label for="edit-f-tags">Order Tags <span style="color:var(--muted);font-weight:400;font-size:11px">(comma se alag karein)</span></label>
-        <input type="text" id="edit-f-tags" maxlength="200" placeholder="e.g. Urgent, COD" autocomplete="off"/>
-      </div>
     </div>
     <div class="form-actions">
       <button class="btn btn-blue" onclick="saveEditOrder()">Save Changes</button>
-      <button class="btn btn-outline" onclick="closeEditOrderModal()">Cancel</button>
     </div>
 
     <!-- ── SCREENSHOT UPLOAD ── -->
@@ -2902,8 +2600,6 @@ async function loadAllFromServer() {
     const ud = await apiFetch('/api/users');
     if (ud.success) {
       users   = ud.users;
-      if (Array.isArray(ud.permissionCatalog) && ud.permissionCatalog.length) permCatalog = ud.permissionCatalog;
-      if (Array.isArray(ud.adminOnlyFeatures)) adminOnlyFeatures = ud.adminOnlyFeatures;
       userIdC = users.length ? Math.max(...users.map(u => u.id)) + 1 : 2;
     }
     // Settings
@@ -2944,9 +2640,8 @@ async function saveClientToServer(orderObj) {
 }
 
 // ── UPDATE STATUS → SQLite ──────────────────────────────────
-// Returns the server's answer so a refused change (no permission) is not shown as done.
 async function updateStatusOnServer(id, status) {
-  return await apiFetch('/api/orders/status', {
+  await apiFetch('/api/orders/status', {
     method: 'POST',
     body: JSON.stringify({ id, status }),
   });
@@ -3295,46 +2990,6 @@ let pendingSId = null, pendingNewS = null, pendingDelId = null;
 let shareLink  = '';
 let role       = 'admin'; // 'admin' | 'staff'
 
-// ─── STAFF PERMISSIONS (RBAC) ──────────────────────────────
-// The server is the real gatekeeper (rbac.js checks every API call). These helpers only
-// decide what to SHOW, so a Staff member never sees buttons/pages they cannot use.
-let myPerms = {};                       // current staff user's permissions (from the server)
-let permCatalog = [                     // replaced by the server's list for the Admin (/api/users)
-  { key: 'view_orders',     label: 'View Orders',            hint: 'Dashboard aur Clients & Orders list dekh sakta hai' },
-  { key: 'create_orders',   label: 'Create / Place Orders',  hint: 'Naya order + Screenshot Import' },
-  { key: 'edit_orders',     label: 'Edit Orders',            hint: 'Naam, number, product, amount, tracking ID' },
-  { key: 'change_tags',     label: 'Change Order Tags',      hint: 'Order par tags lagana / hatana' },
-  { key: 'change_status',   label: 'Change Order Status',    hint: 'Delivered (Completed) / Cancelled' },
-  { key: 'mark_paid',       label: 'Mark Orders as Paid',    hint: 'Status → Paid' },
-  { key: 'mark_pending',    label: 'Mark Orders as Pending', hint: 'Status → Processing' },
-  { key: 'process_returns', label: 'Process Returns',        hint: 'Status → Return' },
-  { key: 'view_reports',    label: 'View Monthly Report',    hint: 'Monthly Report page' },
-];
-let adminOnlyFeatures = ['Staff Management', 'Admin Settings', 'Delete Orders', 'Backups', 'WhatsApp connection settings'];
-const ALL_STATUSES = ['Processing', 'Paid', 'Return', 'Delivered', 'Cancelled'];
-const STATUS_PERM = { Paid: 'mark_paid', Processing: 'mark_pending', Return: 'process_returns', Delivered: 'change_status', Cancelled: 'change_status' };
-function can(key) {
-  if (role === 'admin') return true;
-  if (role !== 'staff') return false;
-  return !!(myPerms && myPerms[key] === true);
-}
-function canSetStatusUI(st) { return role === 'admin' || (STATUS_PERM[st] ? can(STATUS_PERM[st]) : false); }
-function canAnyStatus() { return ALL_STATUSES.some(canSetStatusUI); }
-// Statuses offered when PLACING an order (Processing is always allowed)
-function createStatusOptions() { return ['Processing', 'Paid', 'Return'].filter(st => st === 'Processing' || canSetStatusUI(st)); }
-function pageAllowed(pg) {
-  if (role === 'admin') return true;
-  if (role === 'demo') return !['addclient', 'team', 'demoaccount', 'stafforders'].includes(pg);
-  if (role !== 'staff') return false;
-  if (pg === 'dashboard') return true;
-  if (pg === 'clients')   return can('view_orders');
-  if (pg === 'addclient') return can('create_orders');
-  if (pg === 'report')    return can('view_reports') && can('view_orders');
-  return false;                                         // team, settings, demo account, staff orders
-}
-const tagList = t => String(t || '').split(',').map(x => x.trim()).filter(Boolean);
-const tagsHtml = r => { const t = tagList(r && r.tags); return t.length ? `<div class="tc-tags">${t.map(x => `<span class="tag-chip">${esc(x)}</span>`).join('')}</div>` : ''; };
-
 // ─── USERS / STAFF DATA ────────────────────────────────────
 // (declared at top of script — see above)
 
@@ -3403,7 +3058,6 @@ function bootApp(userRole, userId) {
   } else {
     currentUser = users.find(u => u.role === userRole) || users[0];
   }
-  myPerms = (role === 'staff' && currentUser && currentUser.permissions) ? currentUser.permissions : {};
   document.getElementById('adminApp').style.display = 'flex';
 
   // NOTE: for demo, storeName/label come from the Demo Account config
@@ -3413,7 +3067,11 @@ function bootApp(userRole, userId) {
   if (role === 'staff') {
     document.getElementById('sb-role-label').textContent = 'Staff · ' + storeName;
     document.getElementById('sb-uname').textContent = currentUser ? currentUser.name : 'Staff';
-    // Sidebar / shortcuts follow this staff member's permissions (applyRoleUI)
+    document.getElementById('nav-addclient').style.display = 'none';
+    document.getElementById('add-client-shortcut').style.display = 'none';
+    document.getElementById('nav-team').style.display = 'none';
+    document.getElementById('nav-settings').style.display = 'none';
+    document.getElementById('nav-demo-account').style.display = 'none';
   } else if (role === 'demo') {
     document.getElementById('sb-role-label').textContent = (demoCfgForLabel.accountLabel || 'Demo') + ' · ' + storeName;
     document.getElementById('sb-uname').textContent = currentUser ? currentUser.name : 'Demo User';
@@ -3429,7 +3087,6 @@ function bootApp(userRole, userId) {
     document.getElementById('nav-settings').style.display = 'flex';
     document.getElementById('nav-demo-account').style.display = 'flex';
   }
-  applyRoleUI();
 
   updateTopbarProfile();
   // Re-apply logo to all placements now that DOM is fully visible
@@ -3445,187 +3102,8 @@ function bootApp(userRole, userId) {
   setupDashTableHeader();
   refreshDash();
   renderList();
-  // Never leave a page open that this user may not use (e.g. after a permission change)
-  const activePg = document.querySelector('.page.active');
-  const activeName = activePg ? activePg.id.replace('page-', '') : 'dashboard';
-  if (!pageAllowed(activeName)) showPage('dashboard', document.getElementById('nav-dashboard'));
   document.getElementById('tb-date').textContent =
     new Date().toLocaleDateString('en-PK',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
-}
-
-// ─── ROLE / PERMISSION UI ──────────────────────────────────
-// Shows only what this user may use. Admin: everything (unchanged). Staff: per permission.
-function applyRoleUI() {
-  const show = (id, on, disp = 'flex') => { const el = document.getElementById(id); if (el) el.style.display = on ? disp : 'none'; };
-  const isAdmin = role === 'admin', isStaff = role === 'staff';
-  if (isAdmin || isStaff) {
-    show('nav-dashboard', true);
-    show('nav-addclient', isAdmin || can('create_orders'));
-    show('nav-clients', can('view_orders'));
-    show('nav-report', isAdmin || (can('view_reports') && can('view_orders')));
-    show('nav-team', isAdmin); show('nav-settings', isAdmin); show('nav-demo-account', isAdmin);
-    show('nav-stafforders', isAdmin);
-    show('add-client-shortcut', isAdmin || can('create_orders'), 'inline-flex');
-    show('pd-my-profile', isAdmin, 'block');
-    const addNav = document.getElementById('nav-addclient');
-    if (addNav) addNav.lastChild.textContent = isStaff ? 'New Order' : 'Add Client';
-    // Add-order form: staff orders are always their own; tags only with the permission
-    show('f-assign-wrap', isAdmin);
-    show('f-tags-wrap', can('change_tags'));
-    const fStatus = document.getElementById('f-status');
-    if (fStatus) {
-      const cur = fStatus.value;
-      fStatus.innerHTML = createStatusOptions().map(st => `<option value="${st}">${st}</option>`).join('');
-      fStatus.value = createStatusOptions().includes(cur) ? cur : 'Processing';
-    }
-    const aiBtn = document.getElementById('ai-open-btn');
-    if (aiBtn) aiBtn.style.display = (isAdmin || can('create_orders')) ? '' : 'none';
-  } else {
-    show('nav-stafforders', false);
-  }
-  // Dashboard: staff without "View Orders" get a short notice instead of empty tables
-  const canView = role !== 'staff' || can('view_orders');
-  show('dash-stats-row', canView, 'grid');
-  show('dash-table-card', canView, 'block');
-  show('dash-noperm', !canView, 'block');
-  renderStaffQuickbar();
-  if (window.crmMobileNavUpdate) window.crmMobileNavUpdate();
-}
-
-// Staff dashboard quick actions (orders-focused, phone friendly)
-function renderStaffQuickbar() {
-  const bar = document.getElementById('staff-quickbar');
-  if (!bar) return;
-  if (role !== 'staff') { bar.style.display = 'none'; bar.innerHTML = ''; return; }
-  const me = currentUser || {};
-  const mine = can('view_orders')
-    ? data.filter(r => r.month === dashSelMonth && r.year === dashSelYear && (r.created_by === me.id || (r.created_by_role !== 'staff' && r.assigned_to === me.id)))
-    : [];
-  const n = st => mine.filter(r => r.status === st).length;
-  let btns = '';
-  if (can('create_orders')) btns += `<button type="button" class="sq-btn new" onclick="showPage('addclient',document.getElementById('nav-addclient'))">＋ New Order</button>`;
-  if (can('view_orders')) btns +=
-      `<button type="button" class="sq-btn" onclick="staffQuickFilter('Processing')">Pending <b>${n('Processing')}</b></button>`
-    + `<button type="button" class="sq-btn" onclick="staffQuickFilter('Paid')">Paid <b>${n('Paid')}</b></button>`
-    + `<button type="button" class="sq-btn" onclick="staffQuickFilter('Return')">Returned <b>${n('Return')}</b></button>`;
-  bar.innerHTML = `<div class="sq-hello"><b>Assalam o Alaikum, ${esc(me.name || 'Staff')}</b>`
-    + `<span>${can('view_orders') ? `Mere orders (${MONTH_NAMES[dashSelMonth]}): ${mine.length}` : 'Staff account'}</span></div>`
-    + `<div class="sq-actions">${btns}</div>`;
-  bar.style.display = 'flex';
-}
-function staffQuickFilter(st) {
-  const tab = [...document.querySelectorAll('#page-dashboard .ftab')].find(b => (b.getAttribute('onclick') || '').includes(`'${st}'`));
-  setDashFilter(st, tab);
-  const card = document.getElementById('dash-table-card');
-  if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-// Permission changes by the Admin apply on the server instantly; refresh the screen when the
-// staff member comes back to the tab so their menu matches what the server allows.
-async function refreshMyPermissions() {
-  if (role !== 'staff') return;
-  try {
-    const me = await apiFetch('/api/me');
-    if (!me || !me.success || !me.user) return;
-    const next = me.user.permissions || {};
-    if (JSON.stringify(next) === JSON.stringify(myPerms)) return;
-    myPerms = next;
-    if (currentUser) currentUser.permissions = next;
-    if (can('view_orders')) { const od = await apiFetch('/api/orders'); if (od && od.success) data = od.orders; }
-    else data = [];
-    applyRoleUI(); setupTableHeader(); setupDashTableHeader(); refreshDash(); renderList();
-    const activePg = document.querySelector('.page.active');
-    if (activePg && !pageAllowed(activePg.id.replace('page-', ''))) showPage('dashboard', document.getElementById('nav-dashboard'));
-    toast('Aap ki permissions update ho gayi hain');
-  } catch (e) { console.warn('[CRM] permission refresh', e); }
-}
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refreshMyPermissions(); });
-
-// ─── STAFF ORDERS (Admin) — all numbers come from the server (/api/staff-orders) ──
-const soState = { staff: '', status: '', loaded: false, seq: 0 };
-const soIso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-function soQuickRange(kind) {
-  const f = document.getElementById('so-from'), t = document.getElementById('so-to'), d = new Date();
-  if (kind === 'month') { f.value = soIso(new Date(d.getFullYear(), d.getMonth(), 1)); t.value = soIso(new Date(d.getFullYear(), d.getMonth() + 1, 0)); }
-  else if (kind === 'today') { f.value = t.value = soIso(d); }
-  else { f.value = ''; t.value = ''; }
-  loadStaffOrders();
-}
-function soSetStaff(id) { soState.staff = String(id || ''); const sel = document.getElementById('so-staff'); if (sel) sel.value = soState.staff; loadStaffOrders(); }
-function soSetStatus(st) { soState.status = st; document.querySelectorAll('#so-tabs .ftab').forEach(b => b.classList.toggle('active', b.dataset.st === st)); loadStaffOrders(); }
-async function loadStaffOrders(first) {
-  if (role !== 'admin') return;
-  if (first && !soState.loaded) { soState.loaded = true; soQuickRange('month'); return; }
-  const qs = new URLSearchParams();
-  const from = document.getElementById('so-from').value, to = document.getElementById('so-to').value;
-  if (from) qs.set('from', from);
-  if (to) qs.set('to', to);
-  if (soState.staff) qs.set('staff_id', soState.staff);
-  if (soState.status) qs.set('status', soState.status);
-  const seq = ++soState.seq;
-  let res;
-  try { res = await apiFetch('/api/staff-orders?' + qs.toString()); } catch (e) { toast('Server se connect nahi hua', false); return; }
-  if (seq !== soState.seq) return;                       // a newer filter request is on its way
-  if (!res || !res.success) { toast('❌ ' + ((res && res.message) || 'Staff orders load nahi huay'), false); return; }
-  renderStaffOrders(res);
-}
-function renderStaffOrders(res) {
-  const S = res.summary, set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-  set('so-total', S.total); set('so-pending', S.pending); set('so-paid', S.paid); set('so-returned', S.returned);
-  set('so-completed', S.completed); set('so-cancelled', S.cancelled);
-  set('so-total-sub', 'Rs ' + Math.round(S.amount).toLocaleString() + ' total');
-  set('so-paid-sub', 'Rs ' + Math.round(S.received).toLocaleString() + ' received');
-
-  // Staff selector (keeps the current choice)
-  const sel = document.getElementById('so-staff');
-  sel.innerHTML = '<option value="">All staff</option>' + res.staff.map(s => `<option value="${s.id}">${esc(s.name)}${s.deleted ? ' (deleted)' : ''}</option>`).join('');
-  sel.value = soState.staff;
-  if (sel.value !== soState.staff) { soState.staff = ''; sel.value = ''; }
-
-  // Per-staff cards
-  const grid = document.getElementById('so-staff-grid');
-  grid.innerHTML = res.staff.length ? res.staff.map(s => `
-    <button type="button" class="so-staff-card${String(s.id) === soState.staff ? ' sel' : ''}" onclick="soSetStaff('${String(s.id) === soState.staff ? '' : s.id}')">
-      <div class="so-staff-head">${renderAvatarEl(s, 'sm')}<div style="min-width:0"><div class="so-staff-name">${esc(s.name)}</div>
-        <div class="so-staff-sub">Orders: ${s.total} · Rs ${Math.round(s.amount).toLocaleString()}</div></div></div>
-      <div class="so-staff-nums">
-        <div class="so-num"><b>${s.total}</b><span>Orders</span></div>
-        <div class="so-num p"><b>${s.pending}</b><span>Pending</span></div>
-        <div class="so-num k"><b>${s.paid}</b><span>Paid</span></div>
-        <div class="so-num r"><b>${s.returned}</b><span>Returned</span></div>
-        <div class="so-num c"><b>${s.completed}</b><span>Completed</span></div>
-        <div class="so-num x"><b>${s.cancelled}</b><span>Cancelled</span></div>
-      </div>
-    </button>`).join('') : '<div class="empty" style="grid-column:1/-1"><span>👥</span><p>Abhi koi staff member nahi. Team page se staff add karein.</p></div>';
-
-  // Order list
-  const who = res.staff.find(s => String(s.id) === soState.staff);
-  const tabName = { '': 'All', pending: 'Pending', paid: 'Paid', returned: 'Returned', completed: 'Completed', cancelled: 'Cancelled' }[soState.status];
-  set('so-list-title', `${who ? who.name : 'All Staff'} — ${tabName} Orders`);
-  set('so-list-count', `${res.orders_total} order${res.orders_total === 1 ? '' : 's'}${res.truncated ? ' (pehle 500 dikhaye)' : ''}`);
-  const body = document.getElementById('so-list-body');
-  document.getElementById('so-list-empty').style.display = res.orders.length ? 'none' : 'block';
-  body.innerHTML = res.orders.map(o => `<tr>
-      <td data-label="Order ID" class="so-code">${esc(o.order_code)}</td>
-      <td data-label="Customer" class="so-cust"><b>${esc(o.customer)}</b><small>${esc(o.phone || '')}</small></td>
-      <td data-label="Order Date">${esc(o.date || o.day || '—')}</td>
-      <td data-label="Status"><span class="badge ${bCls[o.status] || 'b-processing'}">${esc(o.status || '—')}</span></td>
-      <td data-label="Payment"><span class="pay-pill pay-${esc(o.payment_status)}">${esc(o.payment_status)}</span></td>
-      <td data-label="Tags">${o.tags.length ? `<span class="tc-tags so-tags">${o.tags.map(t => `<span class="tag-chip">${esc(t)}</span>`).join('')}</span>` : '—'}</td>
-      <td data-label="Total" class="so-amt">Rs ${Number(o.amount).toLocaleString()}</td>
-      <td data-label="Return">${o.return_status === 'Returned' ? '<span class="pay-pill" style="color:var(--red);background:var(--red-dim);border-color:rgba(239,68,68,.25)">Returned</span>' : '—'}</td>
-      <td data-label="Handled By"><span>${esc(o.handled_by.name)}<span class="so-via">${o.handled_by.via === 'created' ? 'placed order' : 'assigned'}</span></span></td>
-    </tr>`).join('');
-
-  // Activity
-  const actBox = document.getElementById('so-activity');
-  const ACT = { created: 'ne order banaya', edited: 'ne order edit kiya', status: 'ne status badla', tags: 'ne tags badle', deleted: 'ne order delete kiya' };
-  actBox.innerHTML = res.activity.length ? res.activity.map(a => {
-    const t = new Date(a.created_at);
-    const when = isNaN(t) ? esc(a.created_at) : t.toLocaleString('en-PK', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-    const o = data.find(r => r.id === a.order_id);
-    return `<div class="so-act-row"><time>${when}</time><span><b>${esc(a.user_name || 'Staff')}</b> ${ACT[a.action] || esc(a.action)} — ${o ? esc(makeOrderId(o)) : '#' + a.order_id}${a.detail ? ` <span style="color:var(--muted)">(${esc(a.detail)})</span>` : ''}</span></div>`;
-  }).join('') : '<div class="empty" style="padding:24px"><span>🕘</span><p>Is range mein koi staff activity nahi.</p></div>';
 }
 
 // ─── TEAM PAGE ─────────────────────────────────────────────
@@ -3667,7 +3145,6 @@ function renderTeamPage() {
       <div>
         <div class="team-name">${esc(u.name)}</div>
         ${passInfo}
-        ${permChipsHtml(u.permissions)}
       </div>
       <div class="team-email">${esc(u.email||'—')}</div>
       <div><span class="team-role-badge role-staff">Staff</span></div>
@@ -3677,49 +3154,6 @@ function renderTeamPage() {
       </div>
     </div>`;
   }).join('');
-}
-
-// ─── STAFF PERMISSION CONTROLS (Admin) ─────────────────────
-function permChipsHtml(perms) {
-  const on = permCatalog.filter(p => perms && perms[p.key]);
-  if (!on.length) return `<div class="perm-chips"><span class="perm-chip none">No access</span></div>`;
-  return `<div class="perm-chips">${on.map(p => `<span class="perm-chip">${esc(p.label)}</span>`).join('')}</div>`;
-}
-function renderPermBox(boxId, perms) {
-  const box = document.getElementById(boxId);
-  if (!box) return;
-  const item = p => `<label class="perm-item"><input type="checkbox" data-perm="${p.key}"${perms && perms[p.key] ? ' checked' : ''} onchange="permBoxChanged('${boxId}', this)"/>`
-    + `<span><b>${esc(p.label)}</b><small>${esc(p.hint || '')}</small></span></label>`;
-  const orderKeys = ['view_orders', 'create_orders', 'edit_orders', 'change_tags', 'change_status', 'mark_paid', 'mark_pending', 'process_returns'];
-  const orderPerms = permCatalog.filter(p => orderKeys.includes(p.key));
-  const otherPerms = permCatalog.filter(p => !orderKeys.includes(p.key));
-  box.innerHTML = `<div class="perm-title"><span>🔐 Staff Permissions</span>
-      <span class="perm-quick"><button type="button" onclick="permBoxAll('${boxId}',true)">All orders</button><button type="button" onclick="permBoxAll('${boxId}',false)">None</button></span></div>
-    <div class="perm-group">Order Permissions</div>${orderPerms.map(item).join('')}
-    ${otherPerms.length ? `<div class="perm-group">Other</div>${otherPerms.map(item).join('')}` : ''}
-    <div class="perm-group">Sirf Admin (staff ko nahi di ja sakti)</div>
-    <div class="perm-locked">${adminOnlyFeatures.map(f => `<label class="perm-item locked" title="Admin only"><input type="checkbox" disabled/><span><b>${esc(f)}</b></span></label>`).join('')}</div>`;
-}
-// "View Orders" is needed by every other order permission — keep it ticked when one of them is.
-function permBoxChanged(boxId, el) {
-  const box = document.getElementById(boxId);
-  const view = box.querySelector('input[data-perm="view_orders"]');
-  const dependents = [...box.querySelectorAll('input[data-perm]')].filter(i => i.dataset.perm !== 'view_orders' && i.dataset.perm !== 'create_orders');
-  if (el === view && !view.checked) {
-    if (dependents.some(i => i.checked)) { dependents.forEach(i => { i.checked = false; }); toast('View Orders ke baghair edit/status/tags/report kaam nahi karte — woh bhi off kar diye'); }
-  } else if (view && el && el.checked && dependents.includes(el) && !view.checked) {
-    view.checked = true; toast('View Orders zaroori hai — on kar diya');
-  }
-}
-function permBoxAll(boxId, on) {
-  document.querySelectorAll(`#${boxId} input[data-perm]`).forEach(i => {
-    if (on) i.checked = i.dataset.perm !== 'view_reports' ? true : i.checked; else i.checked = false;
-  });
-}
-function readPermBox(boxId) {
-  const out = {};
-  document.querySelectorAll(`#${boxId} input[data-perm]`).forEach(i => { if (i.checked) out[i.dataset.perm] = true; });
-  return out;
 }
 
 // ─── MY PROFILE SAVE ───────────────────────────────────────
@@ -3900,7 +3334,6 @@ function openAddStaffModal() {
   av.innerHTML = '👤'; av.className = 'avatar-circle'; av.style.cssText = 'font-size:22px';
   // re-attach id in case it was replaced
   av.id = 'new-staff-avatar';
-  renderPermBox('add-staff-perms', { view_orders: true });
   document.getElementById('addStaffModal').classList.add('open');
 }
 function closeAddStaffModal() { document.getElementById('addStaffModal').classList.remove('open'); }
@@ -3928,7 +3361,7 @@ function saveNewStaff() {
 
   apiFetch('/api/staff/add', {
     method: 'POST',
-    body: JSON.stringify({ name, email, password: pass, photo: newStaffPhoto || null, permissions: readPermBox('add-staff-perms') }),
+    body: JSON.stringify({ name, email, password: pass, photo: newStaffPhoto || null }),
   }).then(res => {
     if (!res.success) { toast(res.message || 'Error hua', false); return; }
     const newUser = res.user;
@@ -3962,7 +3395,6 @@ function openEditStaffModal(id) {
     av.innerHTML = u.name ? u.name.charAt(0).toUpperCase() : '👤';
     av.className = 'avatar-circle'; av.style.fontSize = '22px';
   }
-  renderPermBox('edit-staff-perms', u.permissions || {});
   document.getElementById('editStaffModal').classList.add('open');
 }
 function closeEditStaffModal() { document.getElementById('editStaffModal').classList.remove('open'); }
@@ -3990,11 +3422,10 @@ function saveEditStaff() {
 
   apiFetch('/api/staff/update', {
     method: 'POST',
-    body: JSON.stringify({ id, name: name||u.name, email: email||u.email, password: pass||'', photo: editStaffPhoto||u.photo||null, permissions: readPermBox('edit-staff-perms') }),
+    body: JSON.stringify({ id, name: name||u.name, email: email||u.email, password: pass||'', photo: editStaffPhoto||u.photo||null }),
   }).then(res => {
     if (!res.success) { toast(res.message || 'Update fail hua', false); return; }
     // Update in-memory
-    if (res.user && res.user.permissions) u.permissions = res.user.permissions;
     u.name  = name  || u.name;
     u.email = email || u.email;
     if (pass)          u.password = '[set]';
@@ -4192,7 +3623,7 @@ function setupTableHeader() {
     hdr.innerHTML = `<span>#</span><span>Tracking ID</span><span>Client Name</span><span class="hide-sm">Contact No.</span><span class="hide-md">Product Name</span><span>Total</span><span class="hide-md">Pending</span><span>Status</span><span></span><span></span><span></span>`;
   } else {
     hdr.className = 'tbl-head tbl-staff';
-    hdr.innerHTML = `<span>#</span><span>Tracking ID</span><span>Client Name</span><span class="hide-sm">Contact No.</span><span class="hide-md">Product Name</span><span>Total</span><span>Status</span><span>Actions</span>`;
+    hdr.innerHTML = `<span>#</span><span>Tracking ID</span><span>Client Name</span><span class="hide-sm">Contact No.</span><span class="hide-md">Product Name</span><span>Total</span><span>Status</span>`;
   }
 }
 
@@ -4204,7 +3635,7 @@ function setupDashTableHeader() {
     hdr.innerHTML = `<span>#</span><span>Tracking ID</span><span>Client Name</span><span class="hide-sm">Contact No.</span><span class="hide-md">Product Name</span><span>Total</span><span class="hide-md">Pending</span><span>Status</span><span></span><span></span><span></span>`;
   } else {
     hdr.className = 'tbl-head tbl-staff';
-    hdr.innerHTML = `<span>#</span><span>Tracking ID</span><span>Client Name</span><span class="hide-sm">Contact No.</span><span class="hide-md">Product Name</span><span>Total</span><span>Status</span><span>Actions</span>`;
+    hdr.innerHTML = `<span>#</span><span>Tracking ID</span><span>Client Name</span><span class="hide-sm">Contact No.</span><span class="hide-md">Product Name</span><span>Total</span><span>Status</span>`;
   }
 }
 
@@ -4216,12 +3647,12 @@ const pageInfo = {
   report:      ['Monthly Report',  'Monthly PDF report'],
   team:        ['Team',            'Staff management & profile'],
   demoaccount: ['Demo Account',    'Manage the Demo login & profile'],
-  stafforders: ['Staff Orders',    'Staff ke orders aur activity'],
 };
 
 function showPage(pg, el) {
-  if (pg === 'addclient' && role !== 'admin' && !can('create_orders')) return;
-  if (!pageAllowed(pg)) { toast('Is page ki permission nahi hai', false); return; }
+  if (pg === 'addclient' && role !== 'admin') return;
+  if (pg === 'team' && role !== 'admin') return;
+  if (pg === 'demoaccount' && role !== 'admin') return;
 
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.sb-item').forEach(n => n.classList.remove('active'));
@@ -4258,13 +3689,6 @@ function showPage(pg, el) {
   if (pg === 'team') {
     renderTeamPage();
   }
-  if (pg === 'stafforders') {
-    loadStaffOrders(true);
-  }
-  if (pg === 'addclient' && role === 'staff') {
-    const t = document.getElementById('tb-title'); if (t) t.textContent = 'New Order';
-  }
-  if (window.crmMobileNavSync) window.crmMobileNavSync(pg);
   closeSidebar();
 }
 
@@ -4289,10 +3713,6 @@ function toast(msg, ok=true) {
 function populateAssignDropdown() {
   const sel = document.getElementById('f-assign');
   if (!sel) return;
-  if (role === 'staff' && currentUser) {     // staff orders are always assigned to themselves
-    sel.innerHTML = `<option value="${currentUser.id}">${esc(currentUser.name)}</option>`;
-    return;
-  }
   const adminUser = users.find(u => u.role === 'admin');
   const adminId = adminUser ? adminUser.id : 1;
   const staffList = users.filter(u => u.role === 'staff');
@@ -4509,7 +3929,7 @@ populateProductSelects();
 // so the WhatsApp result is identical. WhatsApp starts only after the server confirms the save.
 let manualSaving = false;
 async function saveClient() {
-  if (role !== 'admin' && !can('create_orders')) { toast('Access denied', false); return; }
+  if (role !== 'admin') { toast('Access denied', false); return; }
   if (manualSaving) return;
   const name    = document.getElementById('f-name').value.trim();
   const phones  = Array.from(document.querySelectorAll('.f-phone-input')).map(i => i.value.trim()).filter(Boolean);
@@ -4523,9 +3943,7 @@ async function saveClient() {
   const adminUser = users.find(u => u.role === 'admin');
   const adminId   = adminUser ? adminUser.id : 1;
   const assignSel = document.getElementById('f-assign');
-  // Staff: the order is always theirs (the server enforces this too)
-  const assigned_to = role === 'staff' && currentUser ? currentUser.id : (assignSel && assignSel.value ? parseInt(assignSel.value) : adminId);
-  const tagsVal = can('change_tags') ? (document.getElementById('f-tags').value || '') : undefined;
+  const assigned_to = assignSel && assignSel.value ? parseInt(assignSel.value) : adminId;
   const sel = document.getElementById('f-product-select');
   const product = sel.value === CUSTOM_PRODUCT_VALUE ? (document.getElementById('f-product-custom').value || '').trim() : sel.value;
   const qty = parseInt(document.getElementById('f-product-qty').value, 10);
@@ -4569,7 +3987,6 @@ async function saveClient() {
       lines: [{ product, qty }],
       whatsapp: { phone: wa.source, screenshot_ids: originals.ids },
     };
-    if (tagsVal !== undefined) orderData.tags = tagsVal;
     let res;
     try { res = await apiFetch('/api/orders/add', { method: 'POST', body: JSON.stringify(orderData) }); }
     catch (e) { console.error('[manual order] save request failed:', e); toast('Order could not be saved. WhatsApp was not opened. (Server se connect nahi hua)', false); return; }
@@ -4599,7 +4016,7 @@ async function saveClient() {
 }
 
 function clearForm() {
-  ['f-name','f-detail','f-amount','f-advance','f-tracking','f-address','f-tags'].forEach(id => {
+  ['f-name','f-detail','f-amount','f-advance','f-tracking','f-address'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -4863,40 +4280,30 @@ function renderRows(rows, bodyId, emptyId, countId) {
       const ssBtn = `<button class="tc-ss-btn${hasSs?' has-ss':''}" onclick="openOrderSsViewer(${r.id},'${esc(makeOrderId(r))}')" title="${hasSs?'Screenshots dekhen':'Koi screenshot nahi'}">📸</button>`;
       return `<div class="tbl-row tbl-admin">
         <span class="tc-num">${String(rows.length - i).padStart(2,'0')}</span>
-        <div class="tc-track">${trackCell(r)}${placedLine(r)}${tagsHtml(r)}</div>
+        <div class="tc-track">${trackCell(r)}${placedLine(r)}</div>
         <div class="tc-name" title="${esc(r.name)}">${esc(r.name)} ${ssBtn}${r.source === 'ai_screenshot' ? '<span class="tc-ai-tag" title="Created with AI Screenshot Import">AI</span>' : ''}</div>
         <div class="tc-phone hide-sm">${esc(r.phone)}</div>
         <div class="tc-detail hide-md" title="${esc(r.detail||'')}">${r.detail ? esc(r.detail) : '<span style="color:var(--dim)">—</span>'}</div>
         <span class="tc-amount">Rs ${r.amount.toLocaleString()}</span>
-        <div class="hide-md tc-pend">${pendCell}</div>
+        <div class="hide-md">${pendCell}</div>
         <div class="tc-status-cell"><span class="badge ${bCls[r.status]||'b-processing'}" onclick="openStatusModal(${r.id})">${r.status}${isPaid?' ✓':''}</span>${waBadge}</div>
-        <div class="tc-actions tc-act-first"><button class="tbl-act share" onclick="openShareModal(${r.id})" title="Share">⇪</button></div>
+        <div class="tc-actions"><button class="tbl-act share" onclick="openShareModal(${r.id})" title="Share">⇪</button></div>
         <div class="tc-actions"><button class="tbl-act edit" onclick="openEditOrderModal(${r.id})" title="Edit">✎</button></div>
         <div class="tc-actions"><button class="tbl-act del" onclick="openDeleteModal(${r.id},'${esc(r.name)}')" title="Delete">✕</button></div>
       </div>`;
     }).join('');
   } else {
-    // Staff (and demo) rows: buttons appear only for actions this account is allowed to do
-    const stCan = role === 'staff' && canAnyStatus();
-    body.innerHTML = [...rows].reverse().map((r, i) => {
-      const acts = [];
-      if (role === 'staff' && can('edit_orders')) acts.push(`<button class="tbl-act edit" onclick="openEditOrderModal(${r.id})" title="Edit order">✎</button>`);
-      if (role === 'staff' && can('change_tags')) acts.push(`<button class="tbl-act" onclick="openTagsModal(${r.id})" title="Order tags">🏷</button>`);
-      if (role === 'staff' && can('view_orders') && r.screenshot_count > 0) acts.push(`<button class="tbl-act" onclick="openOrderSsViewer(${r.id},'${esc(makeOrderId(r))}')" title="Screenshots">📸</button>`);
-      if (role === 'staff' && r.wa_status && (can('create_orders') || can('edit_orders'))) acts.push(`<button type="button" class="tc-wa tc-wa-${r.wa_status === 'sent' ? 'sent' : r.wa_status === 'failed' ? 'failed' : 'busy'}" onclick="waShowProgress(${r.id})" title="WhatsApp status">${r.wa_status === 'sent' ? 'WA ✓' : r.wa_status === 'failed' ? 'WA ✕' : 'WA …'}</button>`);
-      const badge = `<span class="badge ${bCls[r.status]||'b-processing'}"${stCan ? ` onclick="openStatusModal(${r.id})" title="Status badlein"` : ' style="cursor:default"'}>${esc(r.status)}${r.status === 'Paid' ? ' ✓' : ''}</span>`;
-      return `
+    body.innerHTML = [...rows].reverse().map((r, i) => `
       <div class="tbl-row tbl-staff">
         <span class="tc-num">${String(rows.length - i).padStart(2,'0')}</span>
-        <div class="tc-track">${trackCell(r)}${placedLine(r)}${tagsHtml(r)}</div>
+        <div class="tc-track">${trackCell(r)}${placedLine(r)}</div>
         <div class="tc-name" title="${esc(r.name)}">${esc(r.name)}</div>
         <div class="tc-phone hide-sm">${esc(r.phone)}</div>
         <div class="tc-detail hide-md" title="${esc(r.detail||'')}">${r.detail ? esc(r.detail) : '<span style="color:var(--dim)">—</span>'}</div>
         <span class="tc-amount">Rs ${r.amount.toLocaleString()}</span>
-        <div class="tc-stat">${badge}</div>
-        <div class="staff-acts">${acts.join('')}</div>
-      </div>`;
-    }).join('');
+        <div><span class="badge ${bCls[r.status]||'b-processing'}" onclick="openStatusModal(${r.id})">${r.status}</span></div>
+      </div>`
+    ).join('');
   }
 }
 
@@ -4929,36 +4336,27 @@ function renderDashList() {
 // ─── STATUS MODAL ──────────────────────────────────────────
 function openStatusModal(id) {
   if (role !== 'admin' && role !== 'staff') return;
-  if (role === 'staff' && !canAnyStatus()) return;
   pendingSId = id;
   const e = data.find(r => r.id === id);
-  if (!e) return;
   pendingNewS = e.status;
-  // Staff only see the statuses they may set (+ the current one, shown selected)
-  document.querySelectorAll('#statusModal .sopt').forEach(o => {
-    const st = o.dataset.status;
-    o.classList.toggle('is-hidden', !(canSetStatusUI(st) || st === e.status));
-  });
   document.querySelectorAll('.sopt').forEach(o => o.classList.remove('sel'));
-  document.querySelector(`#statusModal .sopt[data-status="${e.status}"]`)?.classList.add('sel');
+  const m = { Processing:'sp', Delivered:'sd', Return:'sc', Paid:'sk' };
+  document.querySelector('.sopt.' + m[e.status])?.classList.add('sel');
   document.getElementById('statusModal').classList.add('open');
 }
 function selectS(s) {
-  if (!canSetStatusUI(s)) return;
   pendingNewS = s;
   document.querySelectorAll('.sopt').forEach(o => o.classList.remove('sel'));
-  document.querySelector(`#statusModal .sopt[data-status="${s}"]`)?.classList.add('sel');
+  const m = { Processing:'sp', Delivered:'sd', Return:'sc', Paid:'sk' };
+  document.querySelector('.sopt.' + m[s])?.classList.add('sel');
 }
 function confirmStatus() {
   const e = data.find(r => r.id === pendingSId);
   if (!e) { closeStatusModal(); return; }
-  if (pendingNewS === e.status) { closeStatusModal(); return; }   // nothing changed
 
   const applyStatus = (newStatus) => {
-    updateStatusOnServer(e.id, newStatus).then(res => {
-      if (res && res.success === false && !res.__demoBlocked) { toast('❌ ' + (res.message || 'Status update nahi hua'), false); return; }
+    updateStatusOnServer(e.id, newStatus).then(() => {
       e.status = newStatus;
-      if (res && res.order) Object.assign(e, res.order);
       saveOrdersToLocalBackup();
       renderList(); renderDashList(); refreshDash();
       toast('✓ Status → ' + newStatus);
@@ -4984,49 +4382,6 @@ function confirmStatus() {
   closeStatusModal();
 }
 function closeStatusModal() { document.getElementById('statusModal').classList.remove('open'); pendingSId = null; pendingNewS = null; }
-
-// ─── ORDER TAGS MODAL ──────────────────────────────────────
-let pendingTagsId = null;
-function openTagsModal(id) {
-  if (!can('change_tags')) return;
-  const e = data.find(r => r.id === id);
-  if (!e) return;
-  pendingTagsId = id;
-  document.getElementById('tags-modal-sub').textContent = `${makeOrderId(e)} · ${e.name}`;
-  const inp = document.getElementById('tags-modal-input');
-  inp.value = tagList(e.tags).join(', ');
-  // Suggestions = tags already used on other orders (most used first)
-  const counts = {};
-  data.forEach(r => tagList(r.tags).forEach(t => { counts[t] = (counts[t] || 0) + 1; }));
-  const sugg = Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 12);
-  document.getElementById('tags-modal-suggest').innerHTML = sugg.map(t =>
-    `<button type="button" onclick="addTagSuggestion(this.dataset.tag)" data-tag="${esc(t)}">＋ ${esc(t)}</button>`).join('');
-  document.getElementById('tagsModal').classList.add('open');
-  setTimeout(() => inp.focus(), 50);
-}
-function addTagSuggestion(t) {
-  const inp = document.getElementById('tags-modal-input');
-  const cur = tagList(inp.value);
-  if (!cur.some(x => x.toLowerCase() === String(t).toLowerCase())) cur.push(t);
-  inp.value = cur.join(', ');
-}
-function closeTagsModal() { document.getElementById('tagsModal').classList.remove('open'); pendingTagsId = null; }
-async function saveTagsModal() {
-  const e = data.find(r => r.id === pendingTagsId);
-  if (!e) { closeTagsModal(); return; }
-  const btn = document.getElementById('tags-modal-save');
-  btn.disabled = true;
-  try {
-    const res = await apiFetch('/api/orders/tags', { method: 'POST', body: JSON.stringify({ id: e.id, tags: document.getElementById('tags-modal-input').value }) });
-    if (!res || !res.success) { toast('❌ ' + ((res && res.message) || 'Tags save nahi huay'), false); return; }
-    e.tags = res.order ? res.order.tags : e.tags;
-    saveOrdersToLocalBackup();
-    closeTagsModal();
-    renderList(); renderDashList();
-    toast('✓ Tags update ho gaye');
-  } catch (err) { toast('Server se connect nahi hua', false); }
-  finally { btn.disabled = false; }
-}
 
 // ─── DELETE MODAL ──────────────────────────────────────────
 function openDeleteModal(id, name) {
@@ -5113,7 +4468,6 @@ function refreshDash() {
   document.getElementById('s-received-trend').textContent  = 'Rs ' + received.toLocaleString();
 
   renderDashList();
-  renderStaffQuickbar();
 }
 
 // ─── REPORT PAGE ───────────────────────────────────────────
@@ -5654,7 +5008,7 @@ renderNotifs();
 let pendingEditId = null;
 
 function openEditOrderModal(id) {
-  if (role !== 'admin' && !can('edit_orders')) return;
+  if (role !== 'admin') return;
   const e = data.find(r => r.id === id);
   if (!e) return;
   pendingEditId = id;
@@ -5674,20 +5028,8 @@ function openEditOrderModal(id) {
   prefillProductFields('edit-f', e.detail || '');
   document.getElementById('edit-f-amount').value  = e.amount  || '';
   document.getElementById('edit-f-advance').value = e.advance || 0;
-  // Status: staff only get the statuses they may set (+ the order's current status)
-  const editStatus = document.getElementById('edit-f-status');
-  const curStatus = e.status || 'Processing';
-  const stOpts = ALL_STATUSES.filter(st => role === 'admin' || st === curStatus || canSetStatusUI(st));
-  if (!stOpts.includes(curStatus)) stOpts.unshift(curStatus);
-  editStatus.innerHTML = stOpts.map(st => `<option value="${esc(st)}">${esc(st)}</option>`).join('');
-  editStatus.value = curStatus;
+  document.getElementById('edit-f-status').value  = e.status  || 'Processing';
   document.getElementById('edit-f-tracking').value = e.tracking_id || '';
-  const tagsIn = document.getElementById('edit-f-tags');
-  tagsIn.value = tagList(e.tags).join(', ');
-  tagsIn.disabled = !can('change_tags');
-  tagsIn.title = can('change_tags') ? '' : 'Tags badalne ki permission nahi hai';
-  document.getElementById('edit-f-tags-wrap').style.display = (can('change_tags') || tagList(e.tags).length) ? '' : 'none';
-  document.getElementById('edit-f-assign-wrap').style.display = role === 'admin' ? '' : 'none';
 
   // Populate assign dropdown
   const assignSel = document.getElementById('edit-f-assign');
@@ -5753,8 +5095,6 @@ function saveEditOrder() {
     id: pendingEditId, name, phone, detail, amount, advance, status, assigned_to, tracking_id,
     date: e.date, month: e.month, year: e.year,
   };
-  // Tags are only sent by users who may change them (the server re-checks)
-  if (can('change_tags')) updatedOrder.tags = document.getElementById('edit-f-tags').value;
 
   apiFetch('/api/orders/update', {
     method: 'POST',
@@ -5763,7 +5103,6 @@ function saveEditOrder() {
     if (!res.success) { toast(res.message || 'Update fail hua', false); return; }
     // Update in-memory
     Object.assign(e, { name, phone, detail, amount, advance, status, assigned_to, tracking_id });
-    if (res.order) Object.assign(e, { tags: res.order.tags, assigned_to: res.order.assigned_to, status: res.order.status, updated_by: res.order.updated_by });
     // Save screenshots
     saveOrderScreenshots(pendingEditId, editSsImages);
     saveOrdersToLocalBackup();
@@ -5954,7 +5293,7 @@ const aiRs   = n => 'Rs ' + Number(n).toLocaleString();
 
 // ── OPEN / CLOSE ────────────────────────────────────────────
 function aiOpenImport() {
-  if (role !== 'admin' && !can('create_orders')) { toast('Access denied', false); return; }
+  if (role !== 'admin') { toast('Access denied', false); return; }
   aiReset();
   aiById('aiImportModal').classList.add('open');
   aiCheckStatus();
@@ -6222,7 +5561,7 @@ function aiRemoveAll() { if (aiState.busy) return; aiState.images = []; aiRender
 // ── EXTRACT ─────────────────────────────────────────────────
 async function aiExtract() {
   if (aiState.busy) return;                          // blocks duplicate requests
-  if (role !== 'admin' && !can('create_orders')) { toast('Access denied', false); return; }
+  if (role !== 'admin') { toast('Access denied', false); return; }
   if (!aiState.images.length) { aiShowStep('upload'); toast('Pehle screenshot upload karein', false); return; }
   const payload = JSON.stringify({
     images: aiState.images.map(im => ({ data: im.dataUrl, name: im.name })),
@@ -6459,7 +5798,6 @@ function aiSaveLineProduct(btn) {
 }
 
 function aiAssignOptions() {
-  if (role === 'staff' && currentUser) return `<option value="${currentUser.id}">${esc(currentUser.name)}</option>`;
   const adminUser = users.find(u => u.role === 'admin');
   const adminId = adminUser ? adminUser.id : 1;
   return `<option value="${adminId}">— Admin (Default) —</option>` +
@@ -6563,9 +5901,9 @@ function aiRenderReview(draft) {
           </div>
           <div class="fg">
             <label for="ai-status">Order Status</label>
-            <select id="ai-status">${createStatusOptions().map(st => `<option value="${st}"${st === 'Processing' ? ' selected' : ''}>${st}</option>`).join('')}</select>
+            <select id="ai-status">${['Processing', 'Paid', 'Return'].map(st => `<option value="${st}"${st === 'Processing' ? ' selected' : ''}>${st}</option>`).join('')}</select>
           </div>
-          <div class="fg"${role === 'staff' ? ' style="display:none"' : ''}>
+          <div class="fg">
             <label for="ai-assign">Assign To Staff</label>
             <select id="ai-assign">${aiAssignOptions()}</select>
           </div>
@@ -7029,17 +6367,6 @@ detectRoute();
     else if(k==='s'){go('clients');setTimeout(function(){var i=document.getElementById('search-input');if(i)i.focus();},150);}
     else toggleSidebar();
   });
-  // Bottom bar follows the user's permissions (staff only see what they may open)
-  var PG={d:'dashboard',o:'clients',a:'addclient',s:'clients'};
-  window.crmMobileNavUpdate=function(){
-    n.querySelectorAll('button').forEach(function(x){var pg=PG[x.dataset.k];x.style.display=(!pg||typeof pageAllowed!=='function'||pageAllowed(pg))?'':'none';});
-    var a=n.querySelector('button[data-k="a"]');if(a&&typeof role!=='undefined')a.lastChild.textContent=role==='staff'?'New Order':'New';
-  };
-  window.crmMobileNavSync=function(pg){
-    var k=pg==='dashboard'?'d':pg==='clients'?'o':pg==='addclient'?'a':null;
-    n.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x.dataset.k===k);});
-  };
-  if(typeof role!=='undefined')window.crmMobileNavUpdate();
 })();
 </script>
 <script>

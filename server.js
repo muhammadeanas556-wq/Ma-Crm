@@ -58,7 +58,6 @@ const ai = require('./ai-import');
 const phoneUtil   = require('./phone');
 const waSender    = require('./whatsapp-sender');
 const createWaFlow = require('./whatsapp-workflow');
-const rbac        = require('./rbac');
 const keyCheck = ai.cleanApiKey(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '');
 const GEMINI_API_KEY = keyCheck.key;
 // ── Backup AI providers (used automatically when the main Gemini key is busy / out of quota) ──
@@ -228,37 +227,6 @@ async function initDB() {
     `vpl_reminder_error TEXT`,                // only set when a send's outcome is unknown (never auto-retried)
   ]) await addColumn('orders', col);
 
-  // ── STAFF ACCESS / RBAC (purely additive — existing rows keep working unchanged) ──
-  //   users.permissions      JSON text of the Staff permissions the Admin ticked (admin ignores it)
-  //   orders.created_by      user id that placed the order (NULL for orders placed before this update)
-  //   orders.created_by_role 'admin' | 'staff' at the moment of placing (survives a staff account delete)
-  //   orders.updated_by/_at  last user who edited / changed status / changed tags
-  //   orders.tags            comma-separated order tags ('' = none)
-  await addColumn('users', `permissions TEXT`);
-  for (const col of [
-    `created_by INTEGER`, `created_by_role TEXT`, `updated_by INTEGER`, `updated_at TEXT`, `tags TEXT DEFAULT ''`,
-  ]) await addColumn('orders', col);
-  await dbRun(`
-    CREATE TABLE IF NOT EXISTS order_activity (
-      id         ${T.id},
-      order_id   INTEGER NOT NULL,
-      user_id    INTEGER,
-      user_role  TEXT,
-      user_name  TEXT,
-      action     TEXT    NOT NULL,
-      detail     TEXT    DEFAULT '',
-      created_at TEXT    NOT NULL
-    )
-  `);
-  await dbRun(`CREATE INDEX IF NOT EXISTS idx_order_activity_user ON order_activity(user_id)`);
-  await dbRun(`CREATE INDEX IF NOT EXISTS idx_order_activity_order ON order_activity(order_id)`);
-  await dbRun(`CREATE INDEX IF NOT EXISTS idx_orders_created_by ON orders(created_by)`);
-  // Staff accounts that existed before this update keep what they could already do
-  // (see rbac.LEGACY_STAFF). Runs only for staff rows that have no permissions saved yet.
-  const legacy = await dbRun(`UPDATE users SET permissions=? WHERE role='staff' AND (permissions IS NULL OR permissions='')`,
-    [rbac.serialize(rbac.LEGACY_STAFF)]);
-  if (legacy.changes) console.log(`🔐 ${legacy.changes} existing staff account(s) given their previous access as permissions`);
-
   await dbRun(`
     CREATE TABLE IF NOT EXISTS order_screenshots (
       id            ${T.id},
@@ -317,15 +285,14 @@ app.post('/api/login', async (req, res) => {
     if (!auth.loginAllowed(ip)) return res.status(429).json({ success: false, message: 'Too many login attempts. Try again later.' });
     if (typeof email !== 'string' || typeof password !== 'string' || !email || !password)
       return res.status(400).json({ success: false, message: 'Email and password required.' });
-    const user = await dbGet(`SELECT id, name, email, role, photo, password, permissions FROM users WHERE LOWER(email)=LOWER(?) LIMIT 1`, [email.trim()]);
+    const user = await dbGet(`SELECT id, name, email, role, photo, password FROM users WHERE LOWER(email)=LOWER(?) LIMIT 1`, [email.trim()]);
     if (!user || !auth.verifyPassword(password, user.password)) {
       auth.loginFailed(ip);
       return res.status(401).json({ success: false, message: 'Invalid email or password.' });
     }
     auth.loginOk(ip);
     await auth.createSession(res, user);
-    res.json({ success: true, user: { id:user.id, name:user.name, email:user.email, role:user.role, photo:user.photo || null,
-      permissions: user.role === 'admin' ? null : rbac.parse(user.permissions) } });
+    res.json({ success: true, user: { id:user.id, name:user.name, email:user.email, role:user.role, photo:user.photo || null } });
   } catch (e) {
     console.error('[login]', e.message);
     res.status(500).json({ success:false, message:'Login could not be completed.' });
@@ -353,19 +320,8 @@ app.post('/api/change-password', async (req, res) => {
 // ── USERS: GET ALL ──────────────────────────────────────────
 app.get('/api/users', async (req, res) => {
   try {
-    const rows = await dbAll(`SELECT id, name, email, role, photo, permissions FROM users ORDER BY role DESC, id ASC`);
-    const admin = rbac.isAdmin(req.user);
-    // Staff only get names/photos of colleagues (for "handled by" labels) — no emails, no permissions.
-    const users = rows.map(u => {
-      const out = { id: u.id, name: u.name, role: u.role, photo: u.photo };
-      if (admin || u.id === req.user.id) {
-        out.email = u.email;
-        if (u.role !== 'admin') out.permissions = rbac.parse(u.permissions);
-      }
-      return out;
-    });
-    if (!admin) return res.json({ success: true, users });
-    res.json({ success: true, users, permissionCatalog: rbac.PERMISSIONS, adminOnlyFeatures: rbac.ADMIN_ONLY_FEATURES });
+    const users = await dbAll(`SELECT id, name, email, role, photo FROM users ORDER BY role DESC, id ASC`);
+    res.json({ success: true, users });
   } catch (e) {
     res.json({ success: false, message: e.message });
   }
@@ -398,13 +354,11 @@ app.post('/api/staff/add', async (req, res) => {
     const exists = await dbGet(`SELECT id FROM users WHERE LOWER(email)=LOWER(?) LIMIT 1`, [email.trim()]);
     if (exists) return res.json({ success: false, message: 'Yeh email pehle se registered hai' });
 
-    const perms = (req.body.permissions && typeof req.body.permissions === 'object') ? req.body.permissions : rbac.NEW_STAFF_DEFAULT;
     const result = await dbRun(
-      `INSERT INTO users (name, email, password, role, photo, permissions) VALUES (?,?,?,?,?,?)`,
-      [name.trim(), email.trim(), auth.hashPassword(password), 'staff', photo||null, rbac.serialize(perms)]
+      `INSERT INTO users (name, email, password, role, photo) VALUES (?,?,?,?,?)`,
+      [name.trim(), email.trim(), auth.hashPassword(password), 'staff', photo||null]
     );
-    const newUser = await dbGet(`SELECT id,name,email,role,photo,permissions FROM users WHERE id=?`,[result.lastID]);
-    newUser.permissions = rbac.parse(newUser.permissions);
+    const newUser = await dbGet(`SELECT id,name,email,role,photo FROM users WHERE id=?`,[result.lastID]);
     res.json({ success: true, user: newUser });
   } catch (e) {
     res.json({ success: false, message: e.message });
@@ -425,12 +379,7 @@ app.post('/api/staff/update', async (req, res) => {
       await dbRun(`UPDATE users SET name=?, email=?, photo=? WHERE id=? AND role='staff'`,
         [name, email, photo||null, id]);
     }
-    // Permissions: only when the Admin sends them (older callers without the field keep the current ones)
-    if (req.body.permissions && typeof req.body.permissions === 'object') {
-      await dbRun(`UPDATE users SET permissions=? WHERE id=? AND role='staff'`, [rbac.serialize(req.body.permissions), id]);
-    }
-    const updated = await dbGet(`SELECT id,name,email,role,photo,permissions FROM users WHERE id=?`,[id]);
-    if (updated) updated.permissions = updated.role === 'admin' ? null : rbac.parse(updated.permissions);
+    const updated = await dbGet(`SELECT id,name,email,role,photo FROM users WHERE id=?`,[id]);
     res.json({ success: true, user: updated });
   } catch (e) {
     res.json({ success: false, message: e.message });
@@ -441,28 +390,12 @@ app.post('/api/staff/update', async (req, res) => {
 app.delete('/api/staff/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const del = await dbRun(`DELETE FROM users WHERE id=? AND role='staff'`, [id]);
-    if (del.changes) await dbRun(`DELETE FROM sessions WHERE user_id=?`, [id]).catch(() => {});   // signed out everywhere
+    await dbRun(`DELETE FROM users WHERE id=? AND role='staff'`, [id]);
     res.json({ success: true });
   } catch (e) {
     res.json({ success: false, message: e.message });
   }
 });
-
-// ── ORDER ACTIVITY / OWNERSHIP HELPERS (Staff access) ───────
-// Activity log is best-effort: a logging failure never blocks or undoes an order change.
-async function logActivity(orderId, user, action, detail = '') {
-  try {
-    await dbRun(`INSERT INTO order_activity (order_id, user_id, user_role, user_name, action, detail, created_at) VALUES (?,?,?,?,?,?,?)`,
-      [orderId, user ? user.id : null, user ? user.role : null, user ? user.name : null, action, String(detail || '').slice(0, 300), new Date().toISOString()]);
-  } catch (e) { console.warn(`[activity] #${orderId} ${action}:`, e.message); }
-}
-async function stampUpdate(orderId, user) {
-  try { await dbRun(`UPDATE orders SET updated_by=?, updated_at=? WHERE id=?`, [user.id, new Date().toISOString(), orderId]); }
-  catch (e) { console.warn(`[orders] #${orderId} updated_by save fail:`, e.message); }
-}
-const forbid = (res, message) => res.status(403).json({ success: false, code: 'forbidden', message });
-const tagsOf = o => String((o && o.tags) || '').split(',').map(t => t.trim()).filter(Boolean);
 
 // ── ORDERS: GET ALL ─────────────────────────────────────────
 app.get('/api/orders', async (req, res) => {
@@ -480,17 +413,8 @@ app.get('/api/orders', async (req, res) => {
 // SAME placeOrder() as AI orders → same WhatsApp. Without it (old callers) it just saves.
 app.post('/api/orders/add', async (req, res) => {
   try {
-    const { name, phone, detail, amount, advance, tracking_id, date, month, year, source } = req.body;
-    let { status, assigned_to } = req.body;
+    const { name, phone, detail, amount, advance, status, assigned_to, tracking_id, date, month, year, source } = req.body;
     if (!name || !phone || !amount) return res.json({ success: false, message: 'Name, phone, amount required hai' });
-    // Staff: the order is always theirs, and a starting status other than Processing needs that status permission
-    if (!rbac.isAdmin(req.user)) {
-      status = status || 'Processing';
-      if (status !== 'Processing' && !rbac.canSetStatus(req.user, status))
-        return forbid(res, `"${status}" status lagane ki permission nahi hai — order Processing mein place karein.`);
-      assigned_to = req.user.id;
-    }
-    const tags = (req.body.tags !== undefined && rbac.can(req.user, 'change_tags')) ? rbac.cleanTags(req.body.tags) : '';
     const waIn = (req.body.whatsapp && typeof req.body.whatsapp === 'object') ? req.body.whatsapp : null;
     let whatsapp = null;
     if (waIn) {
@@ -501,9 +425,7 @@ app.post('/api/orders/add', async (req, res) => {
     const out = await placeOrder({
       name, phone, detail, amount, advance, status, assigned_to, tracking_id, date, month, year,
       source: source === 'ai_screenshot' ? 'ai_screenshot' : 'manual',
-      tags, created_by: req.user.id, created_by_role: req.user.role,
     }, { address: cleanAddress(req.body.address), whatsapp });
-    await logActivity(out.order.id, req.user, 'created', `${out.order.status || 'Processing'} · Rs ${Number(out.order.amount) || 0}`);
     res.json({ success: true, order: out.order, whatsapp: { started: out.waStarted } });
   } catch (e) {
     console.error('[orders/add]', e.stack || e.message);
@@ -516,17 +438,7 @@ app.post('/api/orders/status', async (req, res) => {
   try {
     const { id, status } = req.body;
     if (!id || !status) return res.json({ success: false, message: 'id aur status required hai' });
-    const prev = await dbGet(`SELECT id, status FROM orders WHERE id=?`, [id]);
-    if (!rbac.isAdmin(req.user)) {
-      if (!prev) return res.json({ success: false, message: 'Order nahi mila' });
-      if (prev.status === status) return res.json({ success: true, order: await dbGet(`SELECT * FROM orders WHERE id=?`, [id]) });
-      if (!rbac.canSetStatus(req.user, status)) return forbid(res, `"${status}" status lagane ki permission nahi hai.`);
-    }
     await dbRun(`UPDATE orders SET status=? WHERE id=?`, [status, id]);
-    if (prev && prev.status !== status) {
-      await stampUpdate(id, req.user);
-      await logActivity(prev.id, req.user, 'status', `${prev.status || '—'} → ${status}`);
-    }
     const updated = await dbGet(`SELECT * FROM orders WHERE id=?`,[id]);
     res.json({ success: true, order: updated });
   } catch (e) {
@@ -537,55 +449,17 @@ app.post('/api/orders/status', async (req, res) => {
 // ── ORDERS: UPDATE FULL ORDER (Edit modal) ──────────────────
 app.post('/api/orders/update', async (req, res) => {
   try {
-    const { id, name, phone, detail, amount, advance, tracking_id } = req.body;
-    let { status, assigned_to } = req.body;
+    const { id, name, phone, detail, amount, advance, status, assigned_to, tracking_id } = req.body;
     if (!id || !name || !phone || !amount) return res.json({ success: false, message: 'id, name, phone, amount required hai' });
-    const prevRow = await dbGet(`SELECT * FROM orders WHERE id=?`, [id]).catch(() => null);
-    const hasTags = Object.prototype.hasOwnProperty.call(req.body, 'tags');
-    const newTags = hasTags ? rbac.cleanTags(req.body.tags) : null;
-    if (!rbac.isAdmin(req.user)) {
-      if (!prevRow) return res.json({ success: false, message: 'Order nahi mila' });
-      status = status || prevRow.status;                    // a missing status never resets the order for staff
-      if (status !== prevRow.status && !rbac.canSetStatus(req.user, status))
-        return forbid(res, `"${status}" status lagane ki permission nahi hai.`);
-      if (hasTags && newTags !== String(prevRow.tags || '') && !rbac.can(req.user, 'change_tags'))
-        return forbid(res, 'Tags badalne ki permission nahi hai.');
-      assigned_to = prevRow.assigned_to;                    // staff cannot re-assign orders
-    }
+    const prevRow = await dbGet(`SELECT tracking_id FROM orders WHERE id=?`, [id]).catch(() => null);
     await dbRun(
       `UPDATE orders SET name=?, phone=?, detail=?, amount=?, advance=?, status=?, assigned_to=?, tracking_id=? WHERE id=?`,
       [name, phone, detail||'', amount, advance||0, status||'Processing', assigned_to||1, tracking_id||'', id]
     );
-    if (hasTags) await dbRun(`UPDATE orders SET tags=? WHERE id=?`, [newTags, id]);
     await recordShipment(id, prevRow && prevRow.tracking_id, tracking_id)
       .catch(e => console.warn(`[orders/update] #${id} shipped_date save fail:`, e.message));
-    if (prevRow) {
-      await stampUpdate(id, req.user);
-      const finalStatus = status || 'Processing';
-      await logActivity(prevRow.id, req.user, 'edited', prevRow.status !== finalStatus ? `status ${prevRow.status || '—'} → ${finalStatus}` : 'order details');
-    }
     const updated = await dbGet(`SELECT * FROM orders WHERE id=?`, [id]);
     res.json({ success: true, order: updated });
-  } catch (e) {
-    res.json({ success: false, message: e.message });
-  }
-});
-
-// ── ORDERS: CHANGE TAGS ─────────────────────────────────────
-app.post('/api/orders/tags', async (req, res) => {
-  try {
-    const id = parseInt(req.body && req.body.id);
-    if (!id) return res.json({ success: false, message: 'id required hai' });
-    if (!rbac.can(req.user, 'change_tags')) return forbid(res, 'Tags badalne ki permission nahi hai.');
-    const prev = await dbGet(`SELECT id, tags FROM orders WHERE id=?`, [id]);
-    if (!prev) return res.json({ success: false, message: 'Order nahi mila' });
-    const tags = rbac.cleanTags(req.body.tags);
-    await dbRun(`UPDATE orders SET tags=? WHERE id=?`, [tags, id]);
-    if (tags !== String(prev.tags || '')) {
-      await stampUpdate(id, req.user);
-      await logActivity(id, req.user, 'tags', tags ? tags.replace(/,/g, ', ') : '(removed)');
-    }
-    res.json({ success: true, order: await dbGet(`SELECT * FROM orders WHERE id=?`, [id]) });
   } catch (e) {
     res.json({ success: false, message: e.message });
   }
@@ -596,8 +470,7 @@ app.delete('/api/orders/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     const shotRows = await dbAll(`SELECT file_name FROM order_screenshots WHERE order_id=?`, [id]).catch(() => []);
-    const gone = await dbRun(`DELETE FROM orders WHERE id=?`, [id]);
-    if (gone.changes) await logActivity(id, req.user, 'deleted');
+    await dbRun(`DELETE FROM orders WHERE id=?`, [id]);
     storage.remove(shotRows.map(r => r.file_name)).catch(e => console.warn('[storage] cleanup:', e.message));
     await dbRun(`DELETE FROM order_screenshots WHERE order_id=?`, [id])
       .catch(e => console.warn(`[orders/delete] #${id} screenshot rows:`, e.message));
@@ -614,9 +487,7 @@ app.get('/api/settings', async (req, res) => {
   try {
     const rows = await dbAll(`SELECT key, value FROM settings`);
     const settings = {};
-    // Staff only receive what their screens display (logo + store name), never other admin settings.
-    const STAFF_KEYS = ['macrm_logo', 'macrm_store_name', 'macrm_report_logo'];
-    rows.forEach(r => { if (rbac.isAdmin(req.user) || STAFF_KEYS.includes(r.key)) settings[r.key] = r.value; });
+    rows.forEach(r => settings[r.key] = r.value);
     res.json({ success: true, settings });
   } catch (e) {
     res.json({ success: false, message: e.message });
@@ -723,94 +594,6 @@ app.get('/api/report/months', async (req, res) => {
     `);
     res.json({ success: true, months });
   } catch (e) {
-    res.json({ success: false, message: e.message });
-  }
-});
-
-// ════════════════════════════════════════════════════════════
-//  👥 STAFF ORDERS — Admin-only reporting (gate: OWNER_ONLY + rbac)
-//  GET /api/staff-orders?from=YYYY-MM-DD&to=YYYY-MM-DD&staff_id=N&status=pending|paid|returned|completed|cancelled
-//  Every number is calculated from the orders table on each request.
-//  "Handled by" = the staff member who placed the order (created_by); for orders placed
-//  by the Admin (or before this update) = the staff member it is assigned to.
-// ════════════════════════════════════════════════════════════
-const BUCKETS = ['pending', 'paid', 'returned', 'completed', 'cancelled'];
-const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
-app.get('/api/staff-orders', async (req, res) => {
-  try {
-    if (!rbac.isAdmin(req.user)) return forbid(res, 'Owner access only');
-    const q = req.query || {};
-    const from = ISO_DAY.test(q.from || '') ? q.from : null;
-    const to   = ISO_DAY.test(q.to || '') ? q.to : null;
-    const staffFilter  = /^\d+$/.test(String(q.staff_id || '')) ? Number(q.staff_id) : null;
-    const statusFilter = BUCKETS.includes(q.status) ? q.status : null;
-
-    const users = await dbAll(`SELECT id, name, email, role, photo FROM users ORDER BY id ASC`);
-    const byId = new Map(users.map(u => [u.id, u]));
-    const staffIds = new Set(users.filter(u => u.role === 'staff').map(u => u.id));
-    const rows = await dbAll(`SELECT id, name, phone, detail, status, amount, advance, tags, date, month, year, placed_date, created_at,
-                                     assigned_to, created_by, created_by_role, updated_by, updated_at
-                                FROM orders ORDER BY id DESC`);
-
-    const handlerOf = o => {
-      if (o.created_by != null && (o.created_by_role === 'staff' || staffIds.has(o.created_by))) return { id: o.created_by, via: 'created' };
-      if (o.created_by_role !== 'staff' && o.assigned_to != null && staffIds.has(o.assigned_to)) return { id: o.assigned_to, via: 'assigned' };
-      return null;
-    };
-    const dayOf = o => (ISO_DAY.test(o.placed_date || '') ? o.placed_date : (o.created_at ? String(o.created_at).slice(0, 10) : ''));
-    const inRange = d => (!from || (d && d >= from)) && (!to || (d && d <= to));
-    const nameOf = id => (byId.get(id) ? byId.get(id).name : `Deleted staff #${id}`);
-    const blank = () => ({ total: 0, pending: 0, paid: 0, returned: 0, completed: 0, cancelled: 0, amount: 0, received: 0 });
-    const add = (acc, o, bucket) => {
-      acc.total++; acc[bucket]++; acc.amount += Number(o.amount) || 0;
-      acc.received += bucket === 'paid' ? (Number(o.amount) || 0) : (Number(o.advance) || 0);
-    };
-
-    const summary = blank();
-    const perStaff = new Map([...staffIds].map(id => [id, blank()]));
-    const list = [];
-    for (const o of rows) {
-      const h = handlerOf(o);
-      if (!h) continue;
-      const day = dayOf(o);
-      if (!inRange(day)) continue;
-      const bucket = rbac.statusBucket(o.status);
-      add(summary, o, bucket);
-      if (!perStaff.has(h.id)) perStaff.set(h.id, blank());
-      add(perStaff.get(h.id), o, bucket);
-      if ((staffFilter === null || h.id === staffFilter) && (statusFilter === null || bucket === statusFilter)) {
-        const amount = Number(o.amount) || 0, advance = Number(o.advance) || 0;
-        list.push({
-          id: o.id,
-          order_code: `MA-${String((Number(o.month) || 0) + 1).padStart(2, '0')}${String(o.year || '').slice(-2)}-${o.id}`,
-          customer: o.name, phone: o.phone, detail: o.detail || '',
-          date: o.date || day, day,
-          status: o.status, bucket,
-          payment_status: rbac.paymentStatus(o),
-          return_status: bucket === 'returned' ? 'Returned' : '—',
-          tags: tagsOf(o), amount, advance, remaining: Math.max(0, amount - advance),
-          handled_by: { id: h.id, name: nameOf(h.id), via: h.via, deleted: !byId.has(h.id) },
-          updated_by: o.updated_by != null ? { id: o.updated_by, name: byId.get(o.updated_by) ? byId.get(o.updated_by).name : `User #${o.updated_by}` } : null,
-          updated_at: o.updated_at || null,
-        });
-      }
-    }
-
-    const staff = [...perStaff.entries()].map(([id, s]) => {
-      const u = byId.get(id);
-      return { id, name: u ? u.name : `Deleted staff #${id}`, email: u ? u.email : '', photo: u ? u.photo : null, deleted: !u, ...s };
-    }).sort((a, b) => (b.total - a.total) || a.name.localeCompare(b.name));
-
-    // Recent staff activity (who created / edited / changed status / tags), newest first
-    let act = await dbAll(`SELECT id, order_id, user_id, user_name, action, detail, created_at FROM order_activity
-                            WHERE user_role='staff' ORDER BY id DESC LIMIT 400`).catch(() => []);
-    act = act.filter(a => (staffFilter === null || a.user_id === staffFilter) && inRange(String(a.created_at || '').slice(0, 10))).slice(0, 60);
-
-    const LIMIT = 500;
-    res.json({ success: true, filters: { from, to, staff_id: staffFilter, status: statusFilter },
-      summary, staff, orders: list.slice(0, LIMIT), orders_total: list.length, truncated: list.length > LIMIT, activity: act });
-  } catch (e) {
-    console.error('[staff-orders]', e.message);
     res.json({ success: false, message: e.message });
   }
 });
@@ -1292,12 +1075,11 @@ async function placeOrder(row, { address = '', whatsapp = null } = {}) {
   const moved = [];
   try {
     const r = await dbRun(
-      `INSERT INTO orders (name,phone,detail,amount,advance,status,assigned_to,tracking_id,date,month,year,client_id,source,address,workflow_state,wa_phone,tags,created_by,created_by_role)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO orders (name,phone,detail,amount,advance,status,assigned_to,tracking_id,date,month,year,client_id,source,address,workflow_state,wa_phone)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [row.name, row.phone, row.detail || '', row.amount, row.advance || 0, row.status || 'Processing', row.assigned_to || 1,
        row.tracking_id || '', row.date, row.month, row.year, null, row.source || 'manual',
-       address, whatsapp ? 'ORDER_PLACED' : null, whatsapp ? whatsapp.wa.number : null,
-       row.tags || '', row.created_by || null, row.created_by_role || null]);
+       address, whatsapp ? 'ORDER_PLACED' : null, whatsapp ? whatsapp.wa.number : null]);
     orderId = r.lastID;
 
     // Order Placed Date — stamped by the server at the moment of placement. Failure here never blocks the order.
@@ -1376,13 +1158,8 @@ app.post('/api/clients/save', async (req, res) => {
       if (!whatsapp.ok) return saveFail(res, whatsapp.message);
     }
 
-    const staffUser = !rbac.isAdmin(req.user);
-    if (staffUser && order.status && order.status !== 'Processing' && !rbac.canSetStatus(req.user, order.status))
-      return forbid(res, `"${order.status}" status lagane ki permission nahi hai — order Processing mein place karein.`);
     let assignedTo;
-    if (staffUser) {
-      assignedTo = req.user.id;                             // a staff member's order is always their own
-    } else if (order.assigned_to) {
+    if (order.assigned_to) {
       const u = await dbGet(`SELECT id FROM users WHERE id=?`, [order.assigned_to]);
       if (!u) return saveFail(res, 'Selected staff member was not found');
       assignedTo = u.id;
@@ -1395,9 +1172,7 @@ app.post('/api/clients/save', async (req, res) => {
       name: client.name, phone: client.phone, detail: order.detail, amount: order.amount, advance: order.advance,
       status: order.status, assigned_to: assignedTo, tracking_id: order.tracking_id,
       date: order.date_label || parts.label, month: parts.month, year: parts.year, source,
-      created_by: req.user.id, created_by_role: req.user.role,
     }, { address: cleanAddress(req.body.client && req.body.client.address), whatsapp });
-    await logActivity(out.order.id, req.user, 'created', `${out.order.status || 'Processing'} · Rs ${Number(out.order.amount) || 0}${source === 'ai_screenshot' ? ' · AI import' : ''}`);
     res.json({ success: true, order: out.order, whatsapp: { started: out.waStarted } });
   } catch (e) {
     console.error('[clients/save]', e.stack || e.message);
