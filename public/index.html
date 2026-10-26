@@ -2654,10 +2654,15 @@ async function deleteOrderOnServer(id) {
 
 // ── SAVE SETTING → SQLite ───────────────────────────────────
 async function saveSettingOnServer(key, value) {
-  await apiFetch('/api/settings/set', {
-    method: 'POST',
-    body: JSON.stringify({ key, value }),
-  });
+  // Returns the server's answer so callers can tell a real save from a failed one.
+  try {
+    return await apiFetch('/api/settings/set', {
+      method: 'POST',
+      body: JSON.stringify({ key, value }),
+    });
+  } catch (e) {
+    return { success: false, message: 'Server se connect nahi hua' };
+  }
 }
 
 // ─── USER ACCOUNTS ─────────────────────────────────────────
@@ -4748,19 +4753,22 @@ function printReport() {
 // ─── REPORT LOGO UPLOAD ────────────────────────────────────
 function handleReportLogoUpload(input) {
   const file = input.files[0];
+  input.value = '';
   if (!file) return;
+  if (!/^image\/(png|jpe?g|webp)$/.test(file.type)) { toast('Logo PNG, JPG ya WEBP honi chahiye', false); return; }
+  if (file.size > 2 * 1024 * 1024) { toast('Logo 2MB se choti honi chahiye', false); return; }
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     const dataUrl = e.target.result;
+    const res = await saveSettingOnServer('macrm_report_logo', dataUrl);
+    if (!res || !res.success) { toast('❌ Report logo save NAHI hua: ' + ((res && res.message) || 'server error'), false); return; }
     const txt = document.getElementById('report-logo-text');
     const img = document.getElementById('report-logo-img');
     if (txt) txt.style.display = 'none';
     if (img) { img.src = dataUrl; img.style.display = 'block'; }
-    saveSettingOnServer('macrm_report_logo', dataUrl);
-    toast('✓ Report logo update ho gaya!');
+    toast('✓ Report logo server par save ho gaya!');
   };
   reader.readAsDataURL(file);
-  input.value = '';
 }
 
 // ─── INIT LOGIN RING with saved admin photo ─────────────────
@@ -4783,19 +4791,30 @@ function handleReportLogoUpload(input) {
 // ─── CRM LOGO ──────────────────────────────────────────────
 function handleCrmLogoUpload(input) {
   const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const dataUrl = e.target.result;
-    saveSettingOnServer('macrm_logo', dataUrl);
-    applyCrmLogo(dataUrl);
-    toast('✓ CRM logo update ho gaya!');
-  };
-  reader.readAsDataURL(file);
   input.value = '';
+  if (!file) return;
+  if (!/^image\/(png|jpe?g|webp)$/.test(file.type)) { toast('Logo PNG, JPG ya WEBP honi chahiye', false); return; }
+  if (file.size > 2 * 1024 * 1024) { toast('Logo 2MB se choti honi chahiye', false); return; }
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const dataUrl = e.target.result;
+    const previous = localStorage.getItem('macrm_logo') || null;
+    applyCrmLogo(dataUrl);                       // preview while saving
+    toast('Logo save ho raha hai…');
+    const res = await saveSettingOnServer('macrm_logo', dataUrl);
+    if (!res || !res.success) {
+      applyCrmLogo(previous);                    // roll back — do not pretend it was saved
+      toast('❌ Logo save NAHI hua: ' + ((res && res.message) || 'server error'), false);
+      return;
+    }
+    toast('✓ CRM logo server par save ho gaya!');
+  };
+  reader.onerror = () => toast('Logo file parh nahi saka', false);
+  reader.readAsDataURL(file);
 }
-function removeCrmLogo() {
-  saveSettingOnServer('macrm_logo', '');
+async function removeCrmLogo() {
+  const res = await saveSettingOnServer('macrm_logo', '');
+  if (!res || !res.success) { toast('❌ Logo remove nahi hua: ' + ((res && res.message) || 'server error'), false); return; }
   applyCrmLogo(null);
   toast('Logo remove ho gaya');
 }
