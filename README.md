@@ -36,3 +36,20 @@ Open Chrome → Extensions → Developer mode → **Load unpacked**, select the 
 - This is an adaptation of user-supplied code, not a certified production security assessment. Restrict access to trusted staff, use HTTPS, maintain backups, and run testing before entering sensitive customer data.
 - GitHub Pages and a plain Netlify static site do **not** run the Node/SQLite API. A Node host with persistent disk is required.
 - The extension requires broad HTTPS network permission to reach a user-selected CRM domain, but only injects its CRM helper into a configured site. Install only your own copy and avoid sharing its bridge token.
+
+## Staff access, order isolation & profile pictures (update)
+
+**What changed**
+- Every new order stores its owner: `created_by_user_id`, `created_by_role` (`admin`/`staff`), `created_by_name`, plus `updated_at`. The server sets these from the logged-in session and never changes them on edit (Staff or Admin).
+- **Staff** see, search, filter, edit and change status only on orders they placed. This is enforced in SQL on the server for `GET /api/orders`, `GET /api/orders/:id`, status/update, screenshots, WhatsApp status/retry/mark-sent (incl. Gemini message retries) and the VPL list. Other orders return **403 Access denied**, the same answer as for an order ID that doesn't exist. Delete and Share stay Admin-only.
+- Staff can now **Add Order** (manual form and Gemini screenshot import). Their orders are automatically assigned to them. Staff menu: Dashboard · Add Order · My Orders · My Report · My Profile.
+- Staff only receive their own user record and the branding settings (logo, store name). Team/Staff management, Staff Orders, the report API, backup and settings stay Admin-only on the server.
+- **Admin → Staff Orders** (new menu): totals (Total / Pending / Delivered / Return / Paid / Unpaid), staff-wise cards with profile pictures, and combinable filters (staff, status, date range, Order ID / customer / phone search). Any order opens in the existing editor. The Admin's own orders are never counted here. The existing *Clients & Orders* page also gets an *All / My orders / Staff orders* selector and a "👤 name" tag on staff orders.
+- **Account status** per staff member (Team → Edit → Account Status). A disabled account can't log in, and its open sessions end immediately. Its orders remain visible to Admin.
+- **Profile pictures**: each user has their own photo (`users.photo`), saved through `POST /api/me/photo` and returned by `/api/me`, so it shows after refresh and re-login. Staff upload theirs on *My Profile*. Only real PNG/JPG/WEBP images are accepted, and a missing or broken image falls back to the initial. The CRM logo is separate and is no longer drawn into the login ring by profile code.
+- Fixed: the Team page's "My Profile" card was missing its header tags. That pushed *Product Management* and *Staff Management* outside the Team page, so they showed under every page.
+- The browser's offline order cache is now kept per user, so a shared browser can't show one account's cached orders to another.
+
+**Existing data**: nothing is deleted or rewritten. Columns are added automatically on start. Orders created before this update have no owner and are treated as Admin orders, so Staff never see them and Admin sees them as before.
+
+**Definitions used in counts**: Pending = status *Processing*; Unpaid = any order not marked *Paid*.

@@ -10,7 +10,11 @@ const IDLE_MS = (Number(process.env.SESSION_IDLE_DAYS) || 7)  * 864e5;   // logg
 const MAX_MS  = (Number(process.env.SESSION_MAX_DAYS)  || 30) * 864e5;   // hard limit, then log in again
 const PUBLIC_API = new Set(['/api/login', '/api/health']);
 // Owner (role 'admin') only
-const OWNER_ONLY = [/^\/api\/settings\/set/, /^\/api\/staff(\/|$)/, /^\/api\/whatsapp\/session\/logout/, /^\/api\/backup/, /^\/api\/users\/update/, /^\/api\/change-password/, /^\/api\/orders\/\d+$/, /^\/api\/report(\/|$)/];
+// (/api/users/update is NOT here: every user may update their OWN profile photo — the route checks it.)
+const OWNER_ONLY = [/^\/api\/settings\/set/, /^\/api\/staff(\/|$)/, /^\/api\/staff-orders(\/|$)/, /^\/api\/whatsapp\/session\/logout/, /^\/api\/backup/, /^\/api\/change-password/, /^\/api\/report(\/|$)/];
+// Owner only for one HTTP method (DELETE an order). GET /api/orders/:id is open to staff but ownership-checked in server.js.
+const OWNER_ONLY_METHOD = [['DELETE', /^\/api\/orders\/\d+$/]];
+const KNOWN_ROLES = new Set(['admin', 'staff']);
 
 const sha = s => crypto.createHash('sha256').update(s).digest('hex');
 const clean = ip => String(ip || '').replace(/^::ffff:/, '');
@@ -65,10 +69,11 @@ module.exports = function createAuth({ dbRun, dbGet }) {
   }
   async function sessionOf(req) {
     const t = cookieOf(req, 'crm_sid'); if (!t) return null;
-    const s = await dbGet(`SELECT s.user_id, u.role, u.name, u.email, s.created, s.last_seen
+    const s = await dbGet(`SELECT s.user_id, u.role, u.name, u.email, COALESCE(u.active, 1) AS active, s.created, s.last_seen
                            FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash=?`, [sha(t)]);
     const now = Date.now();
-    if (!s || now - s.created > MAX_MS || now - s.last_seen > IDLE_MS) {
+    // Disabled accounts (Staff Access → Account status) lose their session immediately.
+    if (!s || Number(s.active) === 0 || now - s.created > MAX_MS || now - s.last_seen > IDLE_MS) {
       if (s) await dbRun(`DELETE FROM sessions WHERE token_hash=?`, [sha(t)]);
       return null;
     }
@@ -105,7 +110,9 @@ module.exports = function createAuth({ dbRun, dbGet }) {
     try {
       const user = await sessionOf(req);
       if (!user) return deny(res, 401, 'Session expired. Please sign in again.');
-      if (user.role !== 'admin' && OWNER_ONLY.some(r => r.test(path))) return deny(res, 403, 'Owner access only');
+      if (!KNOWN_ROLES.has(user.role)) return deny(res, 403, 'Access denied');
+      if (user.role !== 'admin' && (OWNER_ONLY.some(r => r.test(path)) ||
+          OWNER_ONLY_METHOD.some(([m, r]) => m === req.method && r.test(path)))) return deny(res, 403, 'Owner access only');
       req.user = user; next();
     } catch (e) { console.error('[auth]', e.message); deny(res, 500, 'Server error'); }
   };

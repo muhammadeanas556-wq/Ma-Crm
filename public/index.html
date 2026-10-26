@@ -1428,6 +1428,57 @@ body {
   .btn,.btn-sm,button{min-height:40px}
   input,select,textarea{font-size:16px!important}
 }
+
+/* ══════════════════════════════════════════
+   STAFF ACCESS · STAFF ORDERS · PROFILE PICTURES (added)
+══════════════════════════════════════════ */
+body.is-staff .admin-only { display: none !important; }
+body:not(.is-staff) .staff-only { display: none !important; }
+.tc-owner-tag { display:inline-flex; align-items:center; gap:3px; margin-left:6px; padding:1px 7px; border-radius:20px; font-size:10px; font-weight:700; font-family:var(--mono); background:var(--yellow-dim); color:var(--yellow); border:1px solid rgba(245,158,11,.22); white-space:nowrap; vertical-align:middle; max-width:120px; overflow:hidden; text-overflow:ellipsis; }
+.my-sum { display:flex; flex-wrap:wrap; gap:8px; padding:12px 20px; border-bottom:1px solid var(--border); align-items:center; }
+.my-sum-title { font-size:12px; font-weight:700; color:var(--white); margin-right:4px; }
+.my-sum .chip { background:var(--bg3); border:1px solid var(--border); border-radius:20px; padding:4px 12px; font-size:12px; color:var(--muted); font-family:var(--mono); }
+.my-sum .chip b { color:var(--white); font-family:var(--font); margin-left:4px; }
+.so-stats { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:10px; padding:16px 20px; }
+.so-stat { background:var(--bg3); border:1px solid var(--border); border-radius:var(--r-md); padding:12px 14px; cursor:pointer; transition:border-color .15s; text-align:left; font-family:var(--font); }
+.so-stat:hover, .so-stat.on { border-color:var(--accent); }
+.so-stat-lbl { font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-family:var(--mono); }
+.so-stat-val { font-size:22px; font-weight:800; color:var(--white); margin-top:4px; }
+.so-stat.st-pending .so-stat-val { color:var(--yellow); }
+.so-stat.st-delivered .so-stat-val { color:var(--green); }
+.so-stat.st-return .so-stat-val { color:var(--red); }
+.so-stat.st-paid .so-stat-val { color:var(--accent2); }
+.so-stat.st-unpaid .so-stat-val { color:var(--orange); }
+.so-staff-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:10px; padding:16px 20px; }
+.so-staff { background:var(--bg3); border:1px solid var(--border); border-radius:var(--r-md); padding:12px 14px; display:flex; flex-direction:column; gap:10px; cursor:pointer; transition:border-color .15s; text-align:left; font-family:var(--font); color:var(--text); }
+.so-staff:hover, .so-staff.on { border-color:var(--accent); }
+.so-staff-head { display:flex; align-items:center; gap:10px; min-width:0; }
+.so-staff-name { font-size:14px; font-weight:700; color:var(--white); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.so-staff-sub { font-size:10px; color:var(--muted); font-family:var(--mono); }
+.so-staff-nums { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; font-size:10px; color:var(--muted); font-family:var(--mono); text-transform:uppercase; letter-spacing:.04em; }
+.so-staff-nums b { display:block; font-size:15px; color:var(--white); font-family:var(--font); letter-spacing:0; }
+.so-filters { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:14px 20px; border-bottom:1px solid var(--border); }
+.so-filters label { font-size:11px; color:var(--muted); font-family:var(--mono); }
+.so-date { background:var(--bg3); border:1px solid var(--border); color:var(--text); padding:7px 10px; border-radius:var(--r-md); font-family:var(--mono); font-size:12px; color-scheme:dark; }
+.so-head, .so-row { display:grid; grid-template-columns:110px minmax(150px,1.3fr) 130px minmax(150px,1fr) 110px 86px 110px 44px; align-items:center; gap:10px; padding:10px 20px; min-width:960px; }
+.so-head { background:var(--bg3); border-bottom:1px solid var(--border); }
+.so-head span { font-size:10px; letter-spacing:.1em; color:var(--muted); text-transform:uppercase; font-family:var(--mono); }
+.so-row { border-bottom:1px solid rgba(255,255,255,.04); font-size:13px; }
+.so-row:hover { background:rgba(255,255,255,.02); }
+.so-oid { font-family:var(--mono); font-size:12px; color:var(--accent2); background:none; border:none; padding:0; cursor:pointer; text-align:left; min-height:0 !important; }
+.so-cust { color:var(--white); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.so-phone, .so-date-cell { font-family:var(--mono); font-size:11px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.so-owner { display:flex; align-items:center; gap:8px; min-width:0; }
+.so-owner-txt { min-width:0; overflow:hidden; }
+.so-owner-txt b { display:block; font-size:12px; color:var(--white); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.so-owner-lbl { font-size:9px; color:var(--muted); font-family:var(--mono); display:block; }
+.pay-badge { display:inline-flex; padding:2px 9px; border-radius:20px; font-size:10px; font-weight:700; font-family:var(--mono); border:1px solid; }
+.pay-paid { background:var(--green-dim); color:var(--green); border-color:rgba(34,197,94,.25); }
+.pay-unpaid { background:var(--orange-dim); color:var(--orange); border-color:rgba(249,115,22,.25); }
+.st-off-badge { font-size:9px; font-family:var(--mono); padding:1px 6px; border-radius:10px; background:var(--red-dim); color:var(--red); border:1px solid rgba(239,68,68,.22); margin-left:6px; }
+.st-on-badge { font-size:9px; font-family:var(--mono); color:var(--green); }
+@media (max-width:1100px) { .so-stats { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media (max-width:520px)  { .so-stats { grid-template-columns:repeat(2,minmax(0,1fr)); padding:12px; } .so-staff-grid, .so-filters { padding:12px; } }
 </style>
 </head>
 <body>
@@ -1515,7 +1566,7 @@ body {
 <div class="sb-overlay" id="sbOverlay" onclick="closeSidebar()"></div>
 
 <aside class="sidebar" id="sidebar">
-  <div class="sb-logo" onclick="document.getElementById('crm-logo-input').click()" title="Click to change CRM logo" style="cursor:pointer;position:relative" onmouseenter="document.getElementById('sb-logo-cam').style.opacity='1'" onmouseleave="document.getElementById('sb-logo-cam').style.opacity='0'">
+  <div class="sb-logo" onclick="if(typeof role!=='undefined'&&role==='admin')document.getElementById('crm-logo-input').click()" title="CRM logo (Admin can change)" style="cursor:pointer;position:relative" onmouseenter="document.getElementById('sb-logo-cam').style.opacity='1'" onmouseleave="document.getElementById('sb-logo-cam').style.opacity='0'">
     <div class="sb-logo-mark" id="sb-logo-mark" style="position:relative;overflow:hidden;flex-shrink:0">
       <span id="sb-logo-text">MA</span>
       <img id="sb-logo-img" src="" style="display:none;width:100%;height:100%;object-fit:cover;position:absolute;inset:0;border-radius:7px"/>
@@ -1534,10 +1585,14 @@ body {
     </div>
     <!-- Add Client — only visible to admin, green accent -->
     <div class="sb-item add-item" id="nav-addclient" onclick="showPage('addclient',this)">
-      <span class="ic">＋</span>Add Client
+      <span class="ic">＋</span><span class="nav-txt">Add Client</span>
     </div>
     <div class="sb-item" id="nav-clients" onclick="showPage('clients',this)">
-      <span class="ic">≡</span>Clients & Orders
+      <span class="ic">≡</span><span class="nav-txt">Clients & Orders</span>
+    </div>
+    <!-- Staff Orders — Admin only: monitor orders placed by Staff -->
+    <div class="sb-item" id="nav-stafforders" onclick="showPage('stafforders',this)" style="display:none">
+      <span class="ic">👥</span>Staff Orders
     </div>
     <div class="sb-item" id="nav-report" onclick="showPage('report',this)">
       <span class="ic">📊</span>Monthly Report
@@ -1550,6 +1605,10 @@ body {
     </div>
     <div class="sb-item" id="nav-demo-account" onclick="showPage('demoaccount',this)" style="display:none">
       <span class="ic">🎭</span>Demo Account
+    </div>
+    <!-- My Profile — Staff only (Admin's profile lives on the Team page) -->
+    <div class="sb-item" id="nav-myprofile" onclick="showPage('myprofile',this)" style="display:none">
+      <span class="ic">👤</span>My Profile
     </div>
   </nav>
   <div class="sb-foot">
@@ -1602,7 +1661,7 @@ body {
         </div>
         <div class="tb-profile-chevron">▾</div>
         <div class="profile-dropdown" id="profileDropdown">
-          <div class="pd-item" onclick="event.stopPropagation();closeProfileDropdown();showPage('team',document.getElementById('nav-team'))">👤 My Profile</div>
+          <div class="pd-item" onclick="event.stopPropagation();closeProfileDropdown();openMyProfile()">👤 My Profile</div>
           <div class="pd-item danger" onclick="event.stopPropagation();closeProfileDropdown();doLogout()">⏻ Sign Out</div>
         </div>
       </div>
@@ -1660,11 +1719,14 @@ body {
 
       </div>
 
+      <!-- Staff: all-time totals of MY orders only (computed from the server-filtered list) -->
+      <div class="card staff-only" style="margin-bottom:16px"><div class="my-sum" id="dash-my-summary" style="border-bottom:none"></div></div>
+
       <!-- Dashboard Table Card -->
       <div class="card dash-table-wrap">
         <div class="card-head">
           <div class="card-head-left">
-            <h3>Clients &amp; Orders</h3>
+            <h3 id="dash-table-title">Clients &amp; Orders</h3>
             <p id="dash-list-count">0 entries</p>
           </div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -1684,6 +1746,8 @@ body {
             <button class="ftab" onclick="setDashFilter('Processing',this)">Processing</button>
             <button class="ftab" onclick="setDashFilter('Paid',this)">Paid</button>
             <button class="ftab" onclick="setDashFilter('Return',this)">Return</button>
+            <button class="ftab" onclick="setDashFilter('Delivered',this)">Delivered</button>
+            <button class="ftab" onclick="setDashFilter('Unpaid',this)">Unpaid</button>
           </div>
         </div>
         <div class="tbl-scroll-wrap">
@@ -1773,7 +1837,7 @@ body {
                 <option value="Return">Return</option>
               </select>
             </div>
-            <div class="fg">
+            <div class="fg admin-only">
               <label>Assign To Staff</label>
               <select id="f-assign">
                 <option value="">— Admin (Default) —</option>
@@ -1853,7 +1917,7 @@ body {
       <div class="card">
         <div class="card-head">
           <div class="card-head-left">
-            <h3>All Clients</h3>
+            <h3 id="list-title">All Clients</h3>
             <p id="list-count">0 entries</p>
           </div>
           <div style="display:flex;align-items:center;gap:10px">
@@ -1862,10 +1926,17 @@ body {
               <select class="month-select" id="clients-month-select" onchange="onClientsMonthChange()"></select>
               <span class="month-bar-label">Year:</span>
               <select class="year-select" id="clients-year-select" onchange="onClientsMonthChange()"></select>
+              <select class="month-select admin-only" id="clients-owner-select" onchange="onClientsOwnerChange(this.value)" title="Kis ke orders dikhayen">
+                <option value="all">All orders</option>
+                <option value="mine">My orders (Admin)</option>
+                <option value="staff">Staff orders</option>
+              </select>
             </div>
             <button class="btn-sm btn-sm-green" id="add-client-shortcut" onclick="showPage('addclient', document.getElementById('nav-addclient'))">＋ Add Client</button>
           </div>
         </div>
+
+        <div class="my-sum staff-only" id="list-my-summary"></div>
 
         <!-- Search left · Filters right -->
         <div class="toolbar">
@@ -1878,6 +1949,8 @@ body {
             <button class="ftab" onclick="setFilter('Processing',this)">Processing</button>
             <button class="ftab" onclick="setFilter('Paid',this)">Paid</button>
             <button class="ftab" onclick="setFilter('Return',this)">Return</button>
+            <button class="ftab" onclick="setFilter('Delivered',this)">Delivered</button>
+            <button class="ftab" onclick="setFilter('Unpaid',this)">Unpaid</button>
           </div>
         </div>
 
@@ -1889,6 +1962,102 @@ body {
         <div id="list-empty" class="empty" style="display:none">
           <span>≡</span>
           <p>Koi entry nahi mili.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── STAFF ORDERS (Admin only) — data comes from /api/staff-orders ── -->
+    <div class="page" id="page-stafforders">
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head">
+          <div class="card-head-left">
+            <h3>Staff Orders — Summary</h3>
+            <p id="so-summary-sub">Sirf Staff ke orders · Admin ke apne orders shamil nahi</p>
+          </div>
+          <button class="btn-sm btn-sm-green" onclick="loadStaffOrders()">↻ Refresh</button>
+        </div>
+        <div class="so-stats" id="so-stats"></div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head">
+          <div class="card-head-left">
+            <h3>Staff-wise Performance</h3>
+            <p>Kisi staff par click karein — sirf us ke orders neeche dikhenge</p>
+          </div>
+        </div>
+        <div class="so-staff-grid" id="so-staff-grid"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div class="card-head-left">
+            <h3>Staff Order List</h3>
+            <p id="so-list-count">0 orders</p>
+          </div>
+        </div>
+        <div class="so-filters">
+          <label for="so-staff-select">Staff</label>
+          <select class="month-select" id="so-staff-select" onchange="soSet('staff', this.value)"><option value="all">All Staff</option></select>
+          <label for="so-from">From</label>
+          <input type="date" class="so-date" id="so-from" onchange="soSet('from', this.value)"/>
+          <label for="so-to">To</label>
+          <input type="date" class="so-date" id="so-to" onchange="soSet('to', this.value)"/>
+          <button class="btn-sm" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:var(--r-md);padding:6px 12px;cursor:pointer;font-size:11px" onclick="soClearFilters()">✕ Clear filters</button>
+        </div>
+        <div class="toolbar">
+          <div class="search-wrap">
+            <span style="color:var(--muted);font-size:13px">⌕</span>
+            <input type="text" id="so-search" placeholder="Order ID, customer, phone..." oninput="soSearch(this.value)"/>
+          </div>
+          <div class="filter-tabs" id="so-status-tabs">
+            <button class="ftab active" data-st="all" onclick="soSet('status','all')">All</button>
+            <button class="ftab" data-st="Processing" onclick="soSet('status','Processing')">Pending</button>
+            <button class="ftab" data-st="Delivered" onclick="soSet('status','Delivered')">Delivered</button>
+            <button class="ftab" data-st="Return" onclick="soSet('status','Return')">Return</button>
+            <button class="ftab" data-st="Paid" onclick="soSet('status','Paid')">Paid</button>
+            <button class="ftab" data-st="Unpaid" onclick="soSet('status','Unpaid')">Unpaid</button>
+          </div>
+        </div>
+        <div class="tbl-scroll-wrap">
+          <div class="so-head"><span>Order</span><span>Customer</span><span>Phone</span><span>Created By</span><span>Status</span><span>Payment</span><span>Date</span><span></span></div>
+          <div id="so-list-body"></div>
+        </div>
+        <div id="so-list-empty" class="empty" style="display:none">
+          <span>👥</span>
+          <p>In filters ke saath koi staff order nahi mila.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── MY PROFILE (Staff) — own profile picture ── -->
+    <div class="page" id="page-myprofile">
+      <div class="card" style="max-width:560px">
+        <div class="card-head">
+          <div class="card-head-left">
+            <h3>👤 My Profile</h3>
+            <p>Apni profile picture update karein</p>
+          </div>
+        </div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:16px">
+          <div style="display:flex;align-items:center;gap:16px">
+            <div class="prof-pic-wrap" onclick="document.getElementById('mp-pic-input').click()" title="Photo change karein">
+              <div id="mp-avatar-display" class="avatar-circle" style="font-size:26px">?</div>
+              <div class="prof-pic-overlay">📷</div>
+            </div>
+            <div>
+              <div style="font-size:15px;color:var(--white);font-weight:700" id="mp-name-display">—</div>
+              <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:3px">Staff</div>
+              <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+                <button class="btn-sm btn-sm-green" onclick="document.getElementById('mp-pic-input').click()">📷 Upload photo</button>
+                <button class="btn-sm" id="mp-remove-btn" style="background:none;border:1px solid var(--border);color:var(--muted);border-radius:var(--r-md);padding:6px 12px;cursor:pointer;font-size:11px" onclick="removeOwnPhoto()">Remove</button>
+              </div>
+            </div>
+            <input type="file" id="mp-pic-input" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="handleOwnPicInput(this)"/>
+          </div>
+          <div class="fg"><label>Full Name</label><input type="text" id="mp-name" disabled style="opacity:.6;cursor:not-allowed"/></div>
+          <div class="fg"><label>Email (login)</label><input type="text" id="mp-email" disabled style="opacity:.6;cursor:not-allowed"/></div>
+          <div style="font-size:11px;color:var(--muted)">Naam, email aur password Admin manage karta hai.</div>
         </div>
       </div>
     </div>
@@ -2033,6 +2202,9 @@ body {
         </div>
 
         <div class="card">
+          <div class="card-head">
+            <div class="card-head-left">
+              <h3>👤 My Profile</h3>
               <p>Apni info update karein</p>
             </div>
           </div>
@@ -2048,7 +2220,7 @@ body {
                 <div style="font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:3px" id="my-profile-role-display">Admin</div>
                 <div style="font-size:10px;color:var(--muted);margin-top:6px">Click photo to change</div>
               </div>
-              <input type="file" id="prof-pic-input" accept="image/jpg,image/jpeg,image/png" style="display:none" onchange="handleMyPicUpload(this)"/>
+              <input type="file" id="prof-pic-input" accept="image/png,image/jpeg,image/webp" style="display:none" onchange="handleMyPicUpload(this)"/>
             </div>
             <div class="fg">
               <label>Full Name</label>
@@ -2240,6 +2412,12 @@ body {
         <div id="edit-staff-current-pass" style="background:rgba(31,217,122,.07);border:1px solid rgba(31,217,122,.2);border-radius:7px;padding:9px 13px;font-size:13px;font-family:var(--mono);color:var(--green)">—</div>
       </div>
       <div class="fg"><label>New Password (khali chhoren agar na badalna ho)</label><input type="text" id="edit-staff-pass" placeholder="Naya password likhein"/></div>
+      <div class="fg"><label>Account Status</label>
+        <select id="edit-staff-active">
+          <option value="1">Active — login kar sakta hai</option>
+          <option value="0">Disabled — login band (orders mehfooz rehte hain)</option>
+        </select>
+      </div>
     </div>
     <div class="form-actions">
       <button class="btn btn-blue" onclick="saveEditStaff()">Update</button>
@@ -2358,7 +2536,7 @@ body {
           <option value="Return">Return</option>
         </select>
       </div>
-      <div class="fg">
+      <div class="fg admin-only">
         <label>Assign To Staff</label>
         <select id="edit-f-assign"></select>
       </div>
@@ -2546,15 +2724,25 @@ async function apiFetch(path, opts = {}) {
 }
 
 // ── BOOT: Load all data from server ─────────────────────────
-const LOCAL_ORDERS_KEY = 'macrm_orders_backup';
+// Per-user key: the old shared key could show one account's cached orders to another account
+// on the same browser, so it is removed and every user gets their own backup.
+const LOCAL_ORDERS_KEY_OLD = 'macrm_orders_backup';
+try { localStorage.removeItem(LOCAL_ORDERS_KEY_OLD); } catch (e) {}
+function ordersBackupKey() {
+  let uid = '';
+  try { uid = sessionStorage.getItem('macrm_uid_active') || ''; } catch (e) {}
+  return uid ? LOCAL_ORDERS_KEY_OLD + '_u' + uid : null;
+}
 
 function saveOrdersToLocalBackup() {
-  try { localStorage.setItem(LOCAL_ORDERS_KEY, JSON.stringify(data)); } catch (e) { console.warn('[CRM]', e); }
+  const key = ordersBackupKey(); if (!key || role === 'demo') return;
+  try { localStorage.setItem(key, JSON.stringify(data)); } catch (e) { console.warn('[CRM]', e); }
 }
 
 function loadOrdersFromLocalBackup() {
   try {
-    const raw = localStorage.getItem(LOCAL_ORDERS_KEY);
+    const key = ordersBackupKey(); if (!key) return false;
+    const raw = localStorage.getItem(key);
     if (!raw) return false;
     const saved = JSON.parse(raw);
     if (Array.isArray(saved) && saved.length) {
@@ -2576,7 +2764,8 @@ async function loadAllFromServer() {
       // Merge any local backup edits that the server may not have saved
       // (e.g. if server was briefly offline during an edit)
       try {
-        const raw = localStorage.getItem(LOCAL_ORDERS_KEY);
+        const bk = ordersBackupKey();
+        const raw = bk ? localStorage.getItem(bk) : null;
         if (raw) {
           const backup = JSON.parse(raw);
           if (Array.isArray(backup)) {
@@ -2641,7 +2830,7 @@ async function saveClientToServer(orderObj) {
 
 // ── UPDATE STATUS → SQLite ──────────────────────────────────
 async function updateStatusOnServer(id, status) {
-  await apiFetch('/api/orders/status', {
+  return await apiFetch('/api/orders/status', {
     method: 'POST',
     body: JSON.stringify({ id, status }),
   });
@@ -2935,6 +3124,7 @@ function finishLogin(userRole, userId) {
     // Real admin/staff: unchanged sessionStorage-based session
     sessionStorage.setItem('macrm_role', userRole);
     sessionStorage.setItem('macrm_uid_active', String(userId));
+    data = [];   // start clean — only what the server returns for THIS account is shown
     // Server se fresh data load karke app boot karo
     loadAllFromServer().then(() => bootApp(userRole, userId));
   }
@@ -2952,6 +3142,9 @@ function doLogout() {
     sessionStorage.removeItem('macrm_uid_active');
   }
   pendingLoginRole = null;
+  // Never keep the previous account's orders / user list in memory for the next login
+  data = []; users = []; currentUser = null;
+  document.body.classList.remove('is-staff', 'is-admin');
   document.getElementById('loginScreen').classList.remove('hidden');
   const emailEl = document.getElementById('login-email');
   if (emailEl) emailEl.value = '';
@@ -2965,7 +3158,7 @@ function changeAdminPass() {
   const newPass = (document.getElementById('my-new-pass').value || '').trim();
   if (!newPass) { toast('Naya password likhein', false); return; }
   if (newPass.length < 12) { toast('Password at least 12 characters hona chahiye', false); return; }
-  const adminUser = users.find(u => u.role === 'admin');
+  const adminUser = (currentUser && currentUser.role === 'admin') ? currentUser : users.find(u => u.role === 'admin');
   const adminId   = adminUser ? adminUser.id : 1;
   apiFetch('/api/change-password', {
     method: 'POST',
@@ -3003,14 +3196,39 @@ let editStaffPhoto = null;
 let myNewPhoto = null;
 
 // ─── TOPBAR PROFILE HELPERS ────────────────────────────────
-function renderAvatarEl(user, size='normal') {
+// Profile pictures are per user account (users.photo). Only real image data URLs are rendered;
+// anything else — or an image that fails to load — falls back to the initial, never a broken image.
+function safePhotoUrl(p) {
+  return (typeof p === 'string' && /^data:image\/(png|jpe?g|webp|gif);base64,[A-Za-z0-9+\/=]+$/.test(p)) ? p : null;
+}
+function avatarInitial(user) { return esc(((user && user.name) || '?').trim().charAt(0).toUpperCase() || '?'); }
+function crmAvatarBroken(img) {
+  const d = document.createElement('div');
+  d.className = img.dataset.fbClass || 'avatar-circle';
+  if (img.id) d.id = img.id;
+  d.setAttribute('style', img.dataset.fbStyle || '');
+  d.textContent = img.dataset.initial || '?';
+  img.replaceWith(d);
+}
+function renderAvatarEl(user, size='normal', px) {
   const cls = size === 'sm' ? 'sm' : '';
-  if (user && user.photo) {
-    return `<img src="${user.photo}" class="avatar-img ${cls}" alt="${esc(user.name||'')}" style="${cls?'width:36px;height:36px':'width:80px;height:80px'};border-radius:50%;object-fit:cover;border:2px solid var(--border2)"/>`;
+  const dim = px || (cls ? 36 : 80);
+  const fbStyle = `width:${dim}px;height:${dim}px;font-size:${Math.round(dim * 0.36)}px`;
+  const src = safePhotoUrl(user && user.photo);
+  if (src) {
+    return `<img src="${src}" class="avatar-img ${cls}" alt="${esc((user && user.name)||'')}" data-initial="${avatarInitial(user)}" data-fb-class="avatar-circle ${cls}" data-fb-style="${fbStyle}" onerror="crmAvatarBroken(this)" style="width:${dim}px;height:${dim}px;border-radius:50%;object-fit:cover;border:2px solid var(--border2);flex-shrink:0"/>`;
   }
-  const initials = (user && user.name) ? user.name.charAt(0).toUpperCase() : '?';
-  const sz = cls ? 'width:36px;height:36px;font-size:13px' : 'width:80px;height:80px;font-size:26px';
-  return `<div class="avatar-circle ${cls}" style="${sz}">${initials}</div>`;
+  return `<div class="avatar-circle ${cls}" style="${fbStyle}">${avatarInitial(user)}</div>`;
+}
+// Re-draws every place the logged-in user's avatar appears (topbar, sidebar, profile pages).
+function refreshAllAvatars() {
+  updateTopbarProfile();
+  const my = document.getElementById('my-avatar-display');
+  if (my && role === 'admin' && currentUser) my.outerHTML = renderAvatarEl(currentUser).replace(/^<(img|div) /, '<$1 id="my-avatar-display" ');
+  const mp = document.getElementById('mp-avatar-display');
+  if (mp && currentUser) mp.outerHTML = renderAvatarEl(currentUser).replace(/^<(img|div) /, '<$1 id="mp-avatar-display" ');
+  const rm = document.getElementById('mp-remove-btn');
+  if (rm) rm.style.display = (currentUser && safePhotoUrl(currentUser.photo)) ? '' : 'none';
 }
 
 function updateTopbarProfile() {
@@ -3027,11 +3245,11 @@ function updateTopbarProfile() {
 function updateSidebarAvatar() {
   const el = document.getElementById('sb-avatar');
   if (!el || !currentUser) return;
-  if (currentUser.photo) {
-    el.outerHTML = '<img id="sb-avatar" src="' + currentUser.photo + '" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:1.5px solid var(--border2);flex-shrink:0" alt="' + esc(currentUser.name||'') + '"/>';
+  const src = safePhotoUrl(currentUser.photo);
+  if (src) {
+    el.outerHTML = '<img id="sb-avatar" src="' + src + '" data-initial="' + avatarInitial(currentUser) + '" data-fb-class="sb-avatar" data-fb-style="" onerror="crmAvatarBroken(this)" style="width:32px;height:32px;border-radius:50%;object-fit:cover;border:1.5px solid var(--border2);flex-shrink:0" alt="' + esc(currentUser.name||'') + '"/>';
   } else {
-    const initials = currentUser.name ? currentUser.name.charAt(0).toUpperCase() : 'M';
-    el.outerHTML = '<div id="sb-avatar" class="sb-avatar">' + initials + '</div>';
+    el.outerHTML = '<div id="sb-avatar" class="sb-avatar">' + avatarInitial(currentUser) + '</div>';
   }
 }
 
@@ -3064,11 +3282,17 @@ function bootApp(userRole, userId) {
   // (Staff → Demo Account) — this must never leak the real business name.
   const demoCfgForLabel = role === 'demo' ? getDemoConfig() : null;
   const storeName = role === 'demo' ? demoCfgForLabel.storeName : getStoreName();
+  document.body.classList.toggle('is-staff', role === 'staff');
+  document.body.classList.toggle('is-admin', role === 'admin');
+  applyRoleLabels();
+  document.getElementById('nav-stafforders').style.display = role === 'admin' ? 'flex' : 'none';
+  document.getElementById('nav-myprofile').style.display   = role === 'staff' ? 'flex' : 'none';
   if (role === 'staff') {
     document.getElementById('sb-role-label').textContent = 'Staff · ' + storeName;
     document.getElementById('sb-uname').textContent = currentUser ? currentUser.name : 'Staff';
-    document.getElementById('nav-addclient').style.display = 'none';
-    document.getElementById('add-client-shortcut').style.display = 'none';
+    // Staff can place their own orders (the server stamps them as the owner)
+    document.getElementById('nav-addclient').style.display = '';
+    document.getElementById('add-client-shortcut').style.display = '';
     document.getElementById('nav-team').style.display = 'none';
     document.getElementById('nav-settings').style.display = 'none';
     document.getElementById('nav-demo-account').style.display = 'none';
@@ -3083,6 +3307,8 @@ function bootApp(userRole, userId) {
   } else {
     document.getElementById('sb-role-label').textContent = 'Admin · ' + storeName;
     document.getElementById('sb-uname').textContent = currentUser ? currentUser.name : 'Muhammad Anas';
+    document.getElementById('nav-addclient').style.display = '';
+    document.getElementById('add-client-shortcut').style.display = '';
     document.getElementById('nav-team').style.display = 'flex';
     document.getElementById('nav-settings').style.display = 'flex';
     document.getElementById('nav-demo-account').style.display = 'flex';
@@ -3117,12 +3343,12 @@ function renderTeamPage() {
   const inp = document.getElementById('store-name-input');
   if (inp) inp.value = getStoreName();
   // My profile section
-  const admin = users.find(u => u.role === 'admin') || currentUser;
+  const admin = (currentUser && currentUser.role === 'admin') ? currentUser : (users.find(u => u.role === 'admin') || currentUser);
   document.getElementById('my-name-input').value = admin.name || '';
   document.getElementById('my-email-input').value = admin.email || '';
   document.getElementById('my-profile-name-display').textContent = admin.name || 'Muhammad Anas';
   document.getElementById('my-profile-role-display').textContent = 'Admin';
-  document.getElementById('my-avatar-display').outerHTML = renderAvatarEl(admin).replace('class="', 'id="my-avatar-display" class="');
+  document.getElementById('my-avatar-display').outerHTML = renderAvatarEl(admin).replace(/^<(img|div) /, '<$1 id="my-avatar-display" ');
   myNewPhoto = null;
 
   // Staff list
@@ -3136,9 +3362,11 @@ function renderTeamPage() {
   body.innerHTML = staffList.map(u => {
     const sp = getStaffPasswords();
     const hasPass = true; // server stores a password hash and never sends it to the browser
-    const passInfo = hasPass
+    const passInfo = (Number(u.active) === 0
+      ? `<span class="st-off-badge" style="margin-left:0">● Disabled</span> `
+      : `<span class="st-on-badge">● Active</span> `) + (hasPass
       ? `<span style="font-size:9px;color:var(--green);font-family:var(--mono)">✓ Password set</span>`
-      : `<span style="font-size:9px;color:var(--red);font-family:var(--mono)">⚠ Password nahi — Edit karo</span>`;
+      : `<span style="font-size:9px;color:var(--red);font-family:var(--mono)">⚠ Password nahi — Edit karo</span>`);
     return `
     <div class="team-row">
       <div>${renderAvatarEl(u,'sm')}</div>
@@ -3157,54 +3385,58 @@ function renderTeamPage() {
 }
 
 // ─── MY PROFILE SAVE ───────────────────────────────────────
-function handleMyPicUpload(input) {
+function handleMyPicUpload(input) { handleOwnPicInput(input); }
+
+// Saves the logged-in user's OWN photo on the server (stored on their user account),
+// then updates every avatar from the saved value — so it also shows after refresh / re-login.
+function handleOwnPicInput(input) {
   const file = input.files[0];
   input.value = '';
   if (!file) return;
   if (!/^image\/(png|jpe?g|webp)$/.test(file.type)) { toast('Photo PNG, JPG ya WEBP honi chahiye', false); return; }
   if (file.size > 2 * 1024 * 1024) { toast('Photo 2MB se choti honi chahiye', false); return; }
-  const admin = users.find(u => u.role === 'admin');
-  if (!admin) return;
   const reader = new FileReader();
-  reader.onload = async e => {
-    const photo = e.target.result;
-    // Preview straight away
-    const old = document.getElementById('my-avatar-display');
-    const img = document.createElement('img');
-    img.id = 'my-avatar-display';
-    img.src = photo;
-    img.style.cssText = 'width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid var(--border2);cursor:pointer;display:block;opacity:.6';
-    old.replaceWith(img);
-    toast('Photo save ho rahi hai…');
-    // Save immediately — no separate Save click needed
-    let res;
-    try {
-      res = await apiFetch('/api/users/update', {
-        method: 'POST',
-        body: JSON.stringify({ id: admin.id, name: admin.name, email: admin.email, photo }),
-      });
-    } catch (err) { res = { success: false, message: 'Server se connect nahi hua' }; }
-    if (!res || !res.success) {
-      renderTeamPage();
-      toast('❌ Photo save NAHI hui: ' + ((res && res.message) || 'server error'), false);
-      return;
-    }
-    img.style.opacity = '1';
-    admin.photo = photo;
-    currentUser = admin;
-    myNewPhoto = null;
-    updateTopbarProfile();
-    toast('✓ Photo server par save ho gayi!');
-  };
+  reader.onload = e => saveOwnPhoto(e.target.result);
   reader.onerror = () => toast('Photo file parh nahi saka', false);
   reader.readAsDataURL(file);
+}
+async function saveOwnPhoto(photo) {
+  if (!currentUser || (role !== 'admin' && role !== 'staff')) return;
+  toast(photo ? 'Photo save ho rahi hai…' : 'Photo remove ho rahi hai…');
+  let res;
+  try { res = await apiFetch('/api/me/photo', { method: 'POST', body: JSON.stringify({ photo: photo || null }) }); }
+  catch (err) { res = { success: false, message: 'Server se connect nahi hua' }; }
+  if (!res || !res.success || !res.user) {
+    toast('❌ Photo save NAHI hui: ' + ((res && res.message) || 'server error'), false);
+    return;
+  }
+  currentUser.photo = res.user.photo || null;            // the value the server actually stored
+  const inList = users.find(u => u.id === currentUser.id);
+  if (inList && inList !== currentUser) inList.photo = currentUser.photo;
+  myNewPhoto = null;
+  refreshAllAvatars();
+  if (role === 'admin' && document.getElementById('page-team').classList.contains('active')) renderTeamPage();
+  toast(photo ? '✓ Photo server par save ho gayi!' : '✓ Photo remove ho gayi');
+}
+function removeOwnPhoto() { saveOwnPhoto(null); }
+
+function openMyProfile() {
+  if (role === 'admin') showPage('team', document.getElementById('nav-team'));
+  else if (role === 'staff') showPage('myprofile', document.getElementById('nav-myprofile'));
+}
+function renderMyProfilePage() {
+  if (!currentUser) return;
+  document.getElementById('mp-name-display').textContent = currentUser.name || '—';
+  document.getElementById('mp-name').value  = currentUser.name || '';
+  document.getElementById('mp-email').value = currentUser.email || '';
+  refreshAllAvatars();
 }
 
 function saveMyProfile() {
   const name  = document.getElementById('my-name-input').value.trim();
   const email = document.getElementById('my-email-input').value.trim();
   if (!name) { toast('Naam darj karein', false); return; }
-  const admin = users.find(u => u.role === 'admin');
+  const admin = (currentUser && currentUser.role === 'admin') ? currentUser : users.find(u => u.role === 'admin');
   if (!admin) return;
 
   apiFetch('/api/users/update', {
@@ -3388,9 +3620,11 @@ function openEditStaffModal(id) {
   const sp = getStaffPasswords();
   const curPass = 'Hidden for security — enter a new password to reset it';
   document.getElementById('edit-staff-current-pass').textContent = curPass;
+  const actSel = document.getElementById('edit-staff-active');
+  if (actSel) actSel.value = Number(u.active) === 0 ? '0' : '1';
   const av = document.getElementById('edit-staff-avatar');
-  if (u.photo) {
-    av.outerHTML = `<img id="edit-staff-avatar" src="${u.photo}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid var(--border2);cursor:pointer" onclick="document.getElementById('edit-staff-pic-input').click()"/>`;
+  if (safePhotoUrl(u.photo)) {
+    av.outerHTML = `<img id="edit-staff-avatar" src="${safePhotoUrl(u.photo)}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid var(--border2);cursor:pointer" onclick="document.getElementById('edit-staff-pic-input').click()"/>`;
   } else {
     av.innerHTML = u.name ? u.name.charAt(0).toUpperCase() : '👤';
     av.className = 'avatar-circle'; av.style.fontSize = '22px';
@@ -3422,7 +3656,8 @@ function saveEditStaff() {
 
   apiFetch('/api/staff/update', {
     method: 'POST',
-    body: JSON.stringify({ id, name: name||u.name, email: email||u.email, password: pass||'', photo: editStaffPhoto||u.photo||null }),
+    body: JSON.stringify({ id, name: name||u.name, email: email||u.email, password: pass||'', photo: editStaffPhoto||u.photo||null,
+                           active: (document.getElementById('edit-staff-active') || {}).value === '0' ? 0 : 1 }),
   }).then(res => {
     if (!res.success) { toast(res.message || 'Update fail hua', false); return; }
     // Update in-memory
@@ -3430,6 +3665,7 @@ function saveEditStaff() {
     u.email = email || u.email;
     if (pass)          u.password = '[set]';
     if (editStaffPhoto) u.photo   = editStaffPhoto;
+    if (res.user) Object.assign(u, res.user);
     closeEditStaffModal();
     renderTeamPage();
     toast('✓ Staff info update ho gayi!');
@@ -3618,7 +3854,7 @@ function makeOrderId(entry) {
 // ─── TABLE HEADERS ─────────────────────────────────────────
 function setupTableHeader() {
   const hdr = document.getElementById('list-header-row');
-  if (role === 'admin') {
+  if (role === 'admin' || role === 'staff') {
     hdr.className = 'tbl-head tbl-admin';
     hdr.innerHTML = `<span>#</span><span>Tracking ID</span><span>Client Name</span><span class="hide-sm">Contact No.</span><span class="hide-md">Product Name</span><span>Total</span><span class="hide-md">Pending</span><span>Status</span><span></span><span></span><span></span>`;
   } else {
@@ -3630,7 +3866,7 @@ function setupTableHeader() {
 function setupDashTableHeader() {
   const hdr = document.getElementById('dash-list-header-row');
   if (!hdr) return;
-  if (role === 'admin') {
+  if (role === 'admin' || role === 'staff') {
     hdr.className = 'tbl-head tbl-admin';
     hdr.innerHTML = `<span>#</span><span>Tracking ID</span><span>Client Name</span><span class="hide-sm">Contact No.</span><span class="hide-md">Product Name</span><span>Total</span><span class="hide-md">Pending</span><span>Status</span><span></span><span></span><span></span>`;
   } else {
@@ -3647,12 +3883,35 @@ const pageInfo = {
   report:      ['Monthly Report',  'Monthly PDF report'],
   team:        ['Team',            'Staff management & profile'],
   demoaccount: ['Demo Account',    'Manage the Demo login & profile'],
+  stafforders: ['Staff Orders',    'Orders placed by Staff — monitor & manage'],
+  myprofile:   ['My Profile',      'Profile picture'],
 };
+// Staff see their own wording: everything they see is THEIR orders only.
+const staffPageInfo = {
+  dashboard: ['Dashboard',  'My orders overview'],
+  addclient: ['Add Order',  'Naya order place karein'],
+  clients:   ['My Orders',  'Sirf aap ke placed orders'],
+  report:    ['My Report',  'Aap ke orders ki monthly report'],
+};
+function setNavText(id, text) { const t = document.querySelector('#' + id + ' .nav-txt'); if (t) t.textContent = text; }
+function applyRoleLabels() {
+  const staff = role === 'staff';
+  setNavText('nav-clients',   staff ? 'My Orders' : 'Clients & Orders');
+  setNavText('nav-addclient', staff ? 'Add Order' : 'Add Client');
+  const lt = document.getElementById('list-title');       if (lt) lt.textContent = staff ? 'My Orders' : 'All Clients';
+  const dt = document.getElementById('dash-table-title'); if (dt) dt.textContent = staff ? 'My Orders' : 'Clients & Orders';
+  const sc = document.getElementById('add-client-shortcut'); if (sc) sc.textContent = staff ? '＋ Add Order' : '＋ Add Client';
+  const so = document.getElementById('s-orders');
+  const lbl = so && so.previousElementSibling;
+  if (lbl && lbl.classList.contains('rpt-sc-lbl')) lbl.textContent = staff ? 'My Orders (This Month)' : 'This Month Orders';
+}
 
 function showPage(pg, el) {
-  if (pg === 'addclient' && role !== 'admin') return;
+  if (pg === 'addclient' && role !== 'admin' && role !== 'staff') return;
   if (pg === 'team' && role !== 'admin') return;
   if (pg === 'demoaccount' && role !== 'admin') return;
+  if (pg === 'stafforders' && role !== 'admin') return;
+  if (pg === 'myprofile' && role !== 'staff') { if (role === 'admin') { pg = 'team'; el = document.getElementById('nav-team'); } else return; }
 
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.sb-item').forEach(n => n.classList.remove('active'));
@@ -3660,7 +3919,7 @@ function showPage(pg, el) {
   if (pg === 'demoaccount') populateDemoAccountForm();
   if (el) el.classList.add('active');
 
-  const [title, sub] = pageInfo[pg] || ['MA CRM',''];
+  const [title, sub] = (role === 'staff' && staffPageInfo[pg]) || pageInfo[pg] || ['MA CRM',''];
   document.getElementById('tb-title').textContent = title;
   document.getElementById('tb-sub').textContent   = sub;
 
@@ -3689,6 +3948,8 @@ function showPage(pg, el) {
   if (pg === 'team') {
     renderTeamPage();
   }
+  if (pg === 'stafforders') loadStaffOrders();
+  if (pg === 'myprofile') renderMyProfilePage();
   closeSidebar();
 }
 
@@ -3929,7 +4190,7 @@ populateProductSelects();
 // so the WhatsApp result is identical. WhatsApp starts only after the server confirms the save.
 let manualSaving = false;
 async function saveClient() {
-  if (role !== 'admin') { toast('Access denied', false); return; }
+  if (role !== 'admin' && role !== 'staff') { toast('Access denied', false); return; }
   if (manualSaving) return;
   const name    = document.getElementById('f-name').value.trim();
   const phones  = Array.from(document.querySelectorAll('.f-phone-input')).map(i => i.value.trim()).filter(Boolean);
@@ -4001,7 +4262,7 @@ async function saveClient() {
 
     const banner = document.getElementById('save-success');
     document.getElementById('save-success-msg').textContent =
-      `"${name}" ka order place ho gaya — Clients & Orders mein check karein`;
+      `"${name}" ka order place ho gaya — ${role === 'staff' ? 'My Orders' : 'Clients & Orders'} mein check karein`;
     banner.style.display = 'flex';
     clearForm();
     refreshDash();
@@ -4264,7 +4525,8 @@ function renderRows(rows, bodyId, emptyId, countId) {
        </div>`
     : `<span class="tc-track-empty">—</span>`;
 
-  if (role === 'admin') {
+  if (role === 'admin' || role === 'staff') {
+    const isAdm = role === 'admin';
     body.innerHTML = [...rows].reverse().map((r, i) => {
       const rem    = r.amount - (r.advance || 0);
       const isPaid = r.status === 'Paid';
@@ -4281,15 +4543,15 @@ function renderRows(rows, bodyId, emptyId, countId) {
       return `<div class="tbl-row tbl-admin">
         <span class="tc-num">${String(rows.length - i).padStart(2,'0')}</span>
         <div class="tc-track">${trackCell(r)}${placedLine(r)}</div>
-        <div class="tc-name" title="${esc(r.name)}">${esc(r.name)} ${ssBtn}${r.source === 'ai_screenshot' ? '<span class="tc-ai-tag" title="Created with AI Screenshot Import">AI</span>' : ''}</div>
+        <div class="tc-name" title="${esc(r.name)}">${esc(r.name)} ${ssBtn}${r.source === 'ai_screenshot' ? '<span class="tc-ai-tag" title="Created with AI Screenshot Import">AI</span>' : ''}${isAdm && r.created_by_role === 'staff' ? `<span class="tc-owner-tag" title="Created by Staff: ${esc(orderOwnerName(r))}">👤 ${esc(orderOwnerName(r))}</span>` : ''}</div>
         <div class="tc-phone hide-sm">${esc(r.phone)}</div>
         <div class="tc-detail hide-md" title="${esc(r.detail||'')}">${r.detail ? esc(r.detail) : '<span style="color:var(--dim)">—</span>'}</div>
         <span class="tc-amount">Rs ${r.amount.toLocaleString()}</span>
         <div class="hide-md">${pendCell}</div>
         <div class="tc-status-cell"><span class="badge ${bCls[r.status]||'b-processing'}" onclick="openStatusModal(${r.id})">${r.status}${isPaid?' ✓':''}</span>${waBadge}</div>
-        <div class="tc-actions"><button class="tbl-act share" onclick="openShareModal(${r.id})" title="Share">⇪</button></div>
+        <div class="tc-actions">${isAdm ? `<button class="tbl-act share" onclick="openShareModal(${r.id})" title="Share">⇪</button>` : ''}</div>
         <div class="tc-actions"><button class="tbl-act edit" onclick="openEditOrderModal(${r.id})" title="Edit">✎</button></div>
-        <div class="tc-actions"><button class="tbl-act del" onclick="openDeleteModal(${r.id},'${esc(r.name)}')" title="Delete">✕</button></div>
+        <div class="tc-actions">${isAdm ? `<button class="tbl-act del" onclick="openDeleteModal(${r.id},'${esc(r.name)}')" title="Delete">✕</button>` : ''}</div>
       </div>`;
     }).join('');
   } else {
@@ -4307,30 +4569,65 @@ function renderRows(rows, bodyId, emptyId, countId) {
   }
 }
 
+// ─── ORDER OWNER / FILTER HELPERS ──────────────────────────
+// `data` already contains ONLY what the server allowed: every order for Admin, own orders for Staff.
+function orderOwnerName(r) {
+  const u = users.find(x => x.id === r.created_by_user_id);
+  return (u && u.name) || r.created_by_name || 'Staff';
+}
+const isStaffOrder = r => r.created_by_role === 'staff';
+function statusMatches(r, f) {
+  if (!f || f === 'all') return true;
+  if (f === 'Unpaid') return r.status !== 'Paid';
+  return r.status === f;
+}
+function orderMatchesSearch(r, q) {
+  if (!q) return true;
+  const digits = q.replace(/\D/g, '');
+  return String(r.name || '').toLowerCase().includes(q) ||
+    String(r.phone || '').toLowerCase().includes(q) ||
+    (digits.length >= 4 && String(r.phone || '').replace(/\D/g, '').includes(digits)) ||
+    (r.detail && r.detail.toLowerCase().includes(q)) ||
+    (r.tracking_id && String(r.tracking_id).toLowerCase().includes(q)) ||
+    makeOrderId(r).toLowerCase().includes(q) || ('#' + r.id) === q;
+}
+let ownerScope = 'all';   // Admin only: all | mine | staff
+function onClientsOwnerChange(v) { ownerScope = v || 'all'; renderList(); }
+function ownerMatches(r) {
+  if (role !== 'admin' || ownerScope === 'all') return true;
+  return ownerScope === 'staff' ? isStaffOrder(r) : !isStaffOrder(r);
+}
+function renderMyOrdersSummary() {
+  if (role !== 'staff') return;
+  const n = f => data.filter(r => statusMatches(r, f)).length;
+  const html = `<span class="my-sum-title">My Orders (all time)</span>
+    <span class="chip">Total<b>${data.length}</b></span>
+    <span class="chip">Pending<b>${n('Processing')}</b></span>
+    <span class="chip">Delivered<b>${n('Delivered')}</b></span>
+    <span class="chip">Return<b>${n('Return')}</b></span>
+    <span class="chip">Paid<b>${n('Paid')}</b></span>
+    <span class="chip">Unpaid<b>${n('Unpaid')}</b></span>`;
+  ['list-my-summary', 'dash-my-summary'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = html; });
+}
+
 // ─── RENDER LIST (Clients page) ────────────────────────────
 function renderList() {
-  // Both admin and staff see all orders for selected month/year
-  let rows = data.filter(r => r.month === selMonth && r.year === selYear);
-  if (filterS !== 'all') rows = rows.filter(r => r.status === filterS);
-  if (searchQ) rows = rows.filter(r =>
-    r.name.toLowerCase().includes(searchQ) ||
-    r.phone.includes(searchQ) ||
-    (r.detail && r.detail.toLowerCase().includes(searchQ))
-  );
+  // Admin: every order (optionally only own / only staff). Staff: their own orders only (server-filtered).
+  let rows = data.filter(r => r.month === selMonth && r.year === selYear && ownerMatches(r));
+  rows = rows.filter(r => statusMatches(r, filterS));
+  if (searchQ) rows = rows.filter(r => orderMatchesSearch(r, searchQ));
   renderRows(rows, 'list-body', 'list-empty', 'list-count');
+  renderMyOrdersSummary();
 }
 
 // ─── RENDER DASH LIST (Dashboard table) ───────────────────
 function renderDashList() {
   // Both admin and staff see all orders for selected month/year
   let rows = data.filter(r => r.month === dashSelMonth && r.year === dashSelYear);
-  if (dashFilterS !== 'all') rows = rows.filter(r => r.status === dashFilterS);
-  if (dashSearchQ) rows = rows.filter(r =>
-    r.name.toLowerCase().includes(dashSearchQ) ||
-    r.phone.includes(dashSearchQ) ||
-    (r.detail && r.detail.toLowerCase().includes(dashSearchQ))
-  );
+  rows = rows.filter(r => statusMatches(r, dashFilterS));
+  if (dashSearchQ) rows = rows.filter(r => orderMatchesSearch(r, dashSearchQ));
   renderRows(rows, 'dash-list-body', 'dash-list-empty', 'dash-list-count');
+  renderMyOrdersSummary();
 }
 
 // ─── STATUS MODAL ──────────────────────────────────────────
@@ -4355,10 +4652,15 @@ function confirmStatus() {
   if (!e) { closeStatusModal(); return; }
 
   const applyStatus = (newStatus) => {
-    updateStatusOnServer(e.id, newStatus).then(() => {
+    updateStatusOnServer(e.id, newStatus).then(res => {
+      if (res && res.success === false && !res.__demoBlocked) {
+        toast('❌ ' + (res.message || 'Status update nahi hua'), false);
+        return;
+      }
       e.status = newStatus;
       saveOrdersToLocalBackup();
       renderList(); renderDashList(); refreshDash();
+      refreshStaffOrdersIfOpen();
       toast('✓ Status → ' + newStatus);
     }).catch(() => {
       // Server offline — update locally anyway
@@ -4796,28 +5098,16 @@ function handleReportLogoUpload(input) {
   reader.readAsDataURL(file);
 }
 
-// ─── INIT LOGIN RING with saved admin photo ─────────────────
-(function initLoginRing() {
-  const adminUser = users.find(u => u.role === 'admin');
-  if (adminUser && adminUser.photo) {
-    const ring = document.getElementById('loginLogoRing');
-    if (ring) ring.innerHTML = `<img src="${adminUser.photo}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/><span class="cam-badge">📷</span>`;
-    const card = document.getElementById('ql-avatar-admin');
-    if (card) card.outerHTML = `<img src="${adminUser.photo}" class="ql-avatar" id="ql-avatar-admin" alt=""/>`;
-  }
-  // Staff photo
-  const staffUser = users.find(u => u.role === 'staff');
-  if (staffUser && staffUser.photo) {
-    const card = document.getElementById('ql-avatar-staff');
-    if (card) card.outerHTML = `<img src="${staffUser.photo}" class="ql-avatar" id="ql-avatar-staff" alt=""/>`;
-  }
-})();
+// ─── LOGIN RING ─────────────────────────────────────────────
+// The login ring shows the CRM LOGO (branding) only — applyCrmLogo() owns it.
+// User profile pictures are a separate system and are never drawn here.
 
 // ─── CRM LOGO ──────────────────────────────────────────────
 function handleCrmLogoUpload(input) {
   const file = input.files[0];
   input.value = '';
   if (!file) return;
+  if (role !== 'admin') { toast('CRM logo sirf Admin change kar sakta hai', false); return; }
   if (!/^image\/(png|jpe?g|webp)$/.test(file.type)) { toast('Logo PNG, JPG ya WEBP honi chahiye', false); return; }
   if (file.size > 2 * 1024 * 1024) { toast('Logo 2MB se choti honi chahiye', false); return; }
   const reader = new FileReader();
@@ -5008,7 +5298,7 @@ renderNotifs();
 let pendingEditId = null;
 
 function openEditOrderModal(id) {
-  if (role !== 'admin') return;
+  if (role !== 'admin' && role !== 'staff') return;
   const e = data.find(r => r.id === id);
   if (!e) return;
   pendingEditId = id;
@@ -5101,13 +5391,14 @@ function saveEditOrder() {
     body: JSON.stringify(updatedOrder),
   }).then(res => {
     if (!res.success) { toast(res.message || 'Update fail hua', false); return; }
-    // Update in-memory
-    Object.assign(e, { name, phone, detail, amount, advance, status, assigned_to, tracking_id });
+    // Update in-memory (server row wins: owner / assignment are decided by the server)
+    Object.assign(e, { name, phone, detail, amount, advance, status, assigned_to, tracking_id }, res.order || {});
     // Save screenshots
     saveOrderScreenshots(pendingEditId, editSsImages);
     saveOrdersToLocalBackup();
     closeEditOrderModal();
     renderList(); renderDashList(); refreshDash();
+    refreshStaffOrdersIfOpen();
     toast('✓ Order update ho gaya!');
   }).catch(() => {
     // Server offline — save locally and warn user
@@ -5293,7 +5584,7 @@ const aiRs   = n => 'Rs ' + Number(n).toLocaleString();
 
 // ── OPEN / CLOSE ────────────────────────────────────────────
 function aiOpenImport() {
-  if (role !== 'admin') { toast('Access denied', false); return; }
+  if (role !== 'admin' && role !== 'staff') { toast('Access denied', false); return; }
   aiReset();
   aiById('aiImportModal').classList.add('open');
   aiCheckStatus();
@@ -5561,7 +5852,7 @@ function aiRemoveAll() { if (aiState.busy) return; aiState.images = []; aiRender
 // ── EXTRACT ─────────────────────────────────────────────────
 async function aiExtract() {
   if (aiState.busy) return;                          // blocks duplicate requests
-  if (role !== 'admin') { toast('Access denied', false); return; }
+  if (role !== 'admin' && role !== 'staff') { toast('Access denied', false); return; }
   if (!aiState.images.length) { aiShowStep('upload'); toast('Pehle screenshot upload karein', false); return; }
   const payload = JSON.stringify({
     images: aiState.images.map(im => ({ data: im.dataUrl, name: im.name })),
@@ -5903,7 +6194,7 @@ function aiRenderReview(draft) {
             <label for="ai-status">Order Status</label>
             <select id="ai-status">${['Processing', 'Paid', 'Return'].map(st => `<option value="${st}"${st === 'Processing' ? ' selected' : ''}>${st}</option>`).join('')}</select>
           </div>
-          <div class="fg">
+          <div class="fg admin-only">
             <label for="ai-assign">Assign To Staff</label>
             <select id="ai-assign">${aiAssignOptions()}</select>
           </div>
@@ -6338,6 +6629,108 @@ async function waUnlink() {
   try { await apiFetch('/api/whatsapp/session/logout', { method: 'POST', body: '{}' }); } catch (e) { console.warn('[CRM]', e); }
   waConnectTick(false);
 }
+
+// ════════════════════════════════════════════════════════════
+//  👥 STAFF ORDERS (Admin) — every number and row comes from /api/staff-orders,
+//  which the server only answers for Admin. Only orders placed by Staff appear here.
+// ════════════════════════════════════════════════════════════
+let soState = { staff: 'all', status: 'all', from: '', to: '', q: '' };
+let soData = null, soTimer = null, soSeq = 0;
+
+async function loadStaffOrders() {
+  if (role !== 'admin') return;
+  const seq = ++soSeq;
+  const qs = new URLSearchParams();
+  Object.entries(soState).forEach(([k, v]) => { if (v && v !== 'all') qs.set(k, v); });
+  let res;
+  try { res = await apiFetch('/api/staff-orders' + (qs.toString() ? '?' + qs : '')); }
+  catch (e) { res = { success: false, message: 'Server se connect nahi hua' }; }
+  if (seq !== soSeq) return;                         // a newer filter request is on its way
+  if (!res || !res.success) { toast('❌ ' + ((res && res.message) || 'Staff orders load nahi huay'), false); return; }
+  soData = res;
+  renderStaffOrders();
+}
+function refreshStaffOrdersIfOpen() {
+  const pg = document.getElementById('page-stafforders');
+  if (role === 'admin' && pg && pg.classList.contains('active')) loadStaffOrders();
+}
+function soSet(key, val) { soState[key] = val || (key === 'staff' || key === 'status' ? 'all' : ''); loadStaffOrders(); }
+function soSearch(v) { clearTimeout(soTimer); soTimer = setTimeout(() => soSet('q', String(v || '').trim()), 300); }
+function soClearFilters() {
+  soState = { staff: 'all', status: 'all', from: '', to: '', q: '' };
+  ['so-from', 'so-to', 'so-search'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  loadStaffOrders();
+}
+function soPickStaff(id) { soSet('staff', String(soState.staff) === String(id) ? 'all' : String(id)); }
+
+function renderStaffOrders() {
+  if (!soData) return;
+  const o = soData.overall, ranged = soState.from || soState.to;
+  document.getElementById('so-summary-sub').textContent =
+    'Sirf Staff ke orders · Admin ke apne orders shamil nahi' + (ranged ? ` · ${soState.from || '…'} → ${soState.to || '…'}` : ' · all time');
+  const stat = (key, lbl, val, cls) => `<button type="button" class="so-stat ${cls}${soState.status === key ? ' on' : ''}" onclick="soSet('status','${key}')">
+      <div class="so-stat-lbl">${lbl}</div><div class="so-stat-val">${Number(val).toLocaleString()}</div></button>`;
+  document.getElementById('so-stats').innerHTML =
+    stat('all', 'Total Staff Orders', o.total, '') + stat('Processing', 'Pending', o.pending, 'st-pending') +
+    stat('Delivered', 'Delivered', o.delivered, 'st-delivered') + stat('Return', 'Return', o.returned, 'st-return') +
+    stat('Paid', 'Paid', o.paid, 'st-paid') + stat('Unpaid', 'Unpaid', o.unpaid, 'st-unpaid');
+
+  // Staff-wise cards (with profile pictures)
+  const grid = document.getElementById('so-staff-grid');
+  const staff = soData.perStaff || [];
+  grid.innerHTML = staff.length ? staff.map(p => `
+    <button type="button" class="so-staff${String(soState.staff) === String(p.id) ? ' on' : ''}" onclick="soPickStaff(${Number(p.id)})" title="Sirf ${esc(p.name)} ke orders dikhayen">
+      <div class="so-staff-head">
+        ${renderAvatarEl(p, 'sm', 40)}
+        <div style="min-width:0">
+          <div class="so-staff-name">${esc(p.name)}${p.deleted ? '<span class="st-off-badge">deleted</span>' : (!p.active ? '<span class="st-off-badge">disabled</span>' : '')}</div>
+          <div class="so-staff-sub">${p.total} order${p.total === 1 ? '' : 's'} · Rs ${Number(p.amount || 0).toLocaleString()}</div>
+        </div>
+      </div>
+      <div class="so-staff-nums">
+        <span>Pending<b>${p.pending}</b></span><span>Delivered<b>${p.delivered}</b></span><span>Return<b>${p.returned}</b></span>
+        <span>Paid<b>${p.paid}</b></span><span>Unpaid<b>${p.unpaid}</b></span><span>Total<b>${p.total}</b></span>
+      </div>
+    </button>`).join('') : '<div class="empty" style="grid-column:1/-1"><span>👥</span><p>Abhi koi staff account nahi — Team page se add karein.</p></div>';
+
+  // Staff dropdown
+  const sel = document.getElementById('so-staff-select');
+  sel.innerHTML = '<option value="all">All Staff</option>' + staff.map(p => `<option value="${Number(p.id)}">${esc(p.name)}${p.deleted ? ' (deleted)' : ''}</option>`).join('');
+  sel.value = String(soState.staff);
+  document.querySelectorAll('#so-status-tabs .ftab').forEach(b => b.classList.toggle('active', b.dataset.st === soState.status));
+
+  // Order list
+  const rows = soData.orders || [];
+  const photoOf = id => { const p = staff.find(x => Number(x.id) === Number(id)); return p ? p : null; };
+  document.getElementById('so-list-count').textContent = rows.length + ' order' + (rows.length === 1 ? '' : 's') + (soData.limited ? ' (latest 1000 — filters se kam karein)' : '');
+  document.getElementById('so-list-empty').style.display = rows.length ? 'none' : 'block';
+  document.getElementById('so-list-body').innerHTML = rows.map(r => {
+    const owner = photoOf(r.created_by_user_id) || { name: r.created_by_display || r.created_by_name || 'Staff' };
+    const ownerName = r.created_by_display || r.created_by_name || owner.name;
+    const isPaid = r.status === 'Paid';
+    return `<div class="so-row">
+      <button type="button" class="so-oid" onclick="soOpenOrder(${r.id})" title="Order kholen">${esc(makeOrderId(r))}</button>
+      <div class="so-cust" title="${esc(r.name)}">${esc(r.name)}</div>
+      <div class="so-phone" title="${esc(r.phone)}">${esc(r.phone)}</div>
+      <div class="so-owner">${renderAvatarEl({ name: ownerName, photo: owner.photo }, 'sm', 28)}<div class="so-owner-txt"><span class="so-owner-lbl">Created By</span><b title="${esc(ownerName)}">${esc(ownerName)}</b></div></div>
+      <div><span class="badge ${bCls[r.status] || 'b-processing'}" onclick="soStatus(${r.id})">${esc(r.status)}${isPaid ? ' ✓' : ''}</span></div>
+      <div><span class="pay-badge ${isPaid ? 'pay-paid' : 'pay-unpaid'}">${isPaid ? 'Paid' : 'Unpaid'}</span></div>
+      <div class="so-date-cell">${esc(fmtPlacedDate(r.order_day) || r.date || '—')}</div>
+      <div class="tc-actions"><button class="tbl-act edit" onclick="soOpenOrder(${r.id})" title="Open / Edit">✎</button></div>
+    </div>`;
+  }).join('');
+}
+// Admin opens a staff order in the existing order editor (all existing Admin actions apply)
+function soEnsureInData(id) {
+  let e = data.find(r => r.id === id);
+  if (!e && soData) {
+    const row = (soData.orders || []).find(r => r.id === id);
+    if (row) { e = { ...row }; data.push(e); }
+  }
+  return e;
+}
+function soOpenOrder(id) { if (soEnsureInData(id)) openEditOrderModal(id); }
+function soStatus(id) { if (soEnsureInData(id)) openStatusModal(id); }
 
 // ─── INIT ──────────────────────────────────────────────────
 detectRoute();

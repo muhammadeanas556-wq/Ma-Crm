@@ -227,6 +227,23 @@ async function initDB() {
     `vpl_reminder_error TEXT`,                // only set when a send's outcome is unknown (never auto-retried)
   ]) await addColumn('orders', col);
 
+  // ── ORDER OWNERSHIP (Staff isolation) ──
+  // Who placed the order. Set ONLY by the server from the logged-in session at creation and
+  // never changed by an edit. Older orders keep NULL here and are treated as Admin orders,
+  // so they are never shown to Staff (the Staff filter is created_by_user_id = <own id>).
+  for (const col of [
+    `created_by_user_id INTEGER`,
+    `created_by_role TEXT`,          // 'admin' | 'staff'
+    `created_by_name TEXT`,          // name at creation time (kept if the staff account is later deleted)
+    `updated_at ${T.ts}`,
+  ]) await addColumn('orders', col);
+  await dbRun(`CREATE INDEX IF NOT EXISTS idx_orders_created_by ON orders(created_by_user_id)`)
+    .catch(e => console.warn('⚠ idx_orders_created_by:', e.message));
+
+  // Per-user profile picture + account status (older databases may be missing these)
+  await addColumn('users', `photo TEXT`);
+  await addColumn('users', `active INTEGER DEFAULT 1`);
+
   await dbRun(`
     CREATE TABLE IF NOT EXISTS order_screenshots (
       id            ${T.id},
@@ -274,6 +291,69 @@ async function initDB() {
 }
 
 // ════════════════════════════════════════════════════════════
+//  🔐 ORDER ACCESS — every order route goes through these.
+//  Admin  → every order.
+//  Staff  → ONLY rows where created_by_user_id = their own user id.
+//  Checked here on the server; the browser is never trusted for this.
+// ════════════════════════════════════════════════════════════
+const isAdmin = u => !!u && u.role === 'admin';
+function canAccessOrder(user, order) {
+  if (!user || !order) return false;
+  if (isAdmin(user)) return true;
+  return user.role === 'staff' && order.created_by_user_id !== null && order.created_by_user_id !== undefined
+    && Number(order.created_by_user_id) === Number(user.id);
+}
+// WHERE fragment that limits an orders query to what this user may see.
+function orderScope(user, alias = '') {
+  const c = alias ? alias + '.' : '';
+  if (isAdmin(user)) return { sql: '1=1', params: [] };
+  if (user && user.role === 'staff') return { sql: `${c}created_by_user_id = ?`, params: [user.id] };
+  return { sql: '1=0', params: [] };
+}
+const ORDER_DENIED = { success: false, code: 'forbidden', message: 'Access denied — this order does not belong to your account.' };
+// Loads an order the current user may act on. Staff get the same 403 for "not yours" and
+// "does not exist", so order IDs belonging to others cannot be probed.
+async function orderForUser(user, rawId) {
+  const id = Number(rawId);
+  if (!Number.isInteger(id) || id <= 0) return { status: 400, body: { success: false, message: 'Invalid order id' } };
+  const order = await dbGet(`SELECT * FROM orders WHERE id=?`, [id]);
+  if (order && canAccessOrder(user, order)) return { order };
+  if (!order && isAdmin(user)) return { status: 404, body: { success: false, code: 'not_found', message: 'Order nahi mila' } };
+  return { status: 403, body: ORDER_DENIED };
+}
+// Route guard for /api/orders/:id/... — puts the checked order on req.order.
+const requireOrderAccess = async (req, res, next) => {
+  try {
+    const r = await orderForUser(req.user, req.params.id);
+    if (!r.order) return res.status(r.status).json(r.body);
+    req.order = r.order; next();
+  } catch (e) { console.error('[order access]', e.message); res.status(500).json({ success: false, message: 'Server error' }); }
+};
+// Ownership stamped on a NEW order — always from the session, never from the request body.
+const ownerOf = user => ({ id: user.id, role: isAdmin(user) ? 'admin' : 'staff', name: user.name || '' });
+
+// ── PROFILE PICTURES — one per user account, stored on the user row ──
+const PHOTO_MAX_CHARS = 3 * 1024 * 1024;   // ≈ 2.2 MB image after base64
+// Accepts a real PNG/JPG/WEBP data URL (bytes are checked), or empty = remove photo.
+function cleanPhoto(p) {
+  if (p === null || p === undefined || p === '') return { ok: true, value: null };
+  if (typeof p !== 'string' || p.length > PHOTO_MAX_CHARS) return { ok: false, message: 'Photo 2MB se choti honi chahiye' };
+  const m = /^data:image\/(png|jpe?g|webp);base64,([A-Za-z0-9+/=\r\n]+)$/.exec(p.trim());
+  if (!m) return { ok: false, message: 'Photo PNG, JPG ya WEBP image honi chahiye' };
+  const kind = sniffImage(Buffer.from(m[2].replace(/[\r\n]/g, ''), 'base64'));
+  if (!kind) return { ok: false, message: 'Photo file sahi image nahi hai' };
+  return { ok: true, value: `data:${kind.mime};base64,${m[2].replace(/[\r\n]/g, '')}` };
+}
+// The photo the client sent back unchanged → keep it without re-validating (old rows stay as they are).
+async function photoForUpdate(userId, incoming) {
+  if (incoming === undefined) return { ok: true, keep: true };
+  const cur = await dbGet(`SELECT photo FROM users WHERE id=?`, [userId]);
+  if (cur && incoming === cur.photo) return { ok: true, keep: true };
+  return cleanPhoto(incoming);
+}
+const USER_COLS = `id, name, email, role, photo, COALESCE(active, 1) AS active, created_at`;
+
+// ════════════════════════════════════════════════════════════
 //  API ROUTES
 // ════════════════════════════════════════════════════════════
 
@@ -285,20 +365,38 @@ app.post('/api/login', async (req, res) => {
     if (!auth.loginAllowed(ip)) return res.status(429).json({ success: false, message: 'Too many login attempts. Try again later.' });
     if (typeof email !== 'string' || typeof password !== 'string' || !email || !password)
       return res.status(400).json({ success: false, message: 'Email and password required.' });
-    const user = await dbGet(`SELECT id, name, email, role, photo, password FROM users WHERE LOWER(email)=LOWER(?) LIMIT 1`, [email.trim()]);
+    const user = await dbGet(`SELECT id, name, email, role, photo, COALESCE(active, 1) AS active, password FROM users WHERE LOWER(email)=LOWER(?) LIMIT 1`, [email.trim()]);
     if (!user || !auth.verifyPassword(password, user.password)) {
       auth.loginFailed(ip);
       return res.status(401).json({ success: false, message: 'Invalid email or password.' });
     }
+    if (Number(user.active) === 0) return res.status(403).json({ success: false, message: 'Yeh account band (disabled) hai. Admin se rabta karein.' });
     auth.loginOk(ip);
     await auth.createSession(res, user);
-    res.json({ success: true, user: { id:user.id, name:user.name, email:user.email, role:user.role, photo:user.photo || null } });
+    res.json({ success: true, user: { id:user.id, name:user.name, email:user.email, role:user.role, photo:user.photo || null, active: 1 } });
   } catch (e) {
     console.error('[login]', e.message);
     res.status(500).json({ success:false, message:'Login could not be completed.' });
   }
 });
-app.get('/api/me', (req, res) => res.json({ success:true, user:req.user }));
+// Full profile of the logged-in user, INCLUDING the profile picture (so it shows after refresh / re-login).
+app.get('/api/me', async (req, res) => {
+  try {
+    const u = await dbGet(`SELECT ${USER_COLS} FROM users WHERE id=?`, [req.user.id]);
+    res.json({ success: true, user: u || req.user });
+  } catch (e) { res.json({ success: true, user: req.user }); }
+});
+
+// Upload / replace / remove the logged-in user's OWN profile picture (Admin and Staff).
+app.post('/api/me/photo', async (req, res) => {
+  try {
+    const ph = cleanPhoto(req.body && req.body.photo);
+    if (!ph.ok) return res.status(400).json({ success: false, message: ph.message });
+    await dbRun(`UPDATE users SET photo=? WHERE id=?`, [ph.value, req.user.id]);
+    const u = await dbGet(`SELECT ${USER_COLS} FROM users WHERE id=?`, [req.user.id]);
+    res.json({ success: true, user: u });
+  } catch (e) { console.error('[me/photo]', e.message); res.status(500).json({ success: false, message: 'Photo save nahi hui' }); }
+});
 app.post('/api/logout', async (req, res) => {
   await auth.destroySession(req, res);
   res.json({ success:true });
@@ -320,7 +418,10 @@ app.post('/api/change-password', async (req, res) => {
 // ── USERS: GET ALL ──────────────────────────────────────────
 app.get('/api/users', async (req, res) => {
   try {
-    const users = await dbAll(`SELECT id, name, email, role, photo FROM users ORDER BY role DESC, id ASC`);
+    // Staff receive ONLY their own account — no admin details, no other staff.
+    const users = isAdmin(req.user)
+      ? await dbAll(`SELECT ${USER_COLS} FROM users ORDER BY role DESC, id ASC`)
+      : await dbAll(`SELECT ${USER_COLS} FROM users WHERE id=?`, [req.user.id]);
     res.json({ success: true, users });
   } catch (e) {
     res.json({ success: false, message: e.message });
@@ -330,14 +431,20 @@ app.get('/api/users', async (req, res) => {
 // ── USERS: UPDATE PROFILE ───────────────────────────────────
 app.post('/api/users/update', async (req, res) => {
   try {
-    const { id, name, email, photo } = req.body;
-    if (!id || !name) return res.json({ success: false, message: 'id aur name required hai' });
+    const { id, name, email, photo } = req.body || {};
+    if (!id) return res.json({ success: false, message: 'id required hai' });
     if (Number(id) !== req.user.id) return res.status(403).json({ success: false, message: 'You may edit only your own profile.' });
-    await dbRun(
-      `UPDATE users SET name=?, email=?, photo=? WHERE id=?`,
-      [name.trim(), (email||'').trim(), photo||null, id]
-    );
-    const updated = await dbGet(`SELECT id,name,email,role,photo FROM users WHERE id=?`,[id]);
+    const ph = await photoForUpdate(req.user.id, photo === undefined ? undefined : (photo || null));
+    if (!ph.ok) return res.status(400).json({ success: false, message: ph.message });
+    if (isAdmin(req.user)) {
+      if (!name || !String(name).trim()) return res.json({ success: false, message: 'id aur name required hai' });
+      if (ph.keep) await dbRun(`UPDATE users SET name=?, email=? WHERE id=?`, [String(name).trim(), String(email||'').trim(), id]);
+      else await dbRun(`UPDATE users SET name=?, email=?, photo=? WHERE id=?`, [String(name).trim(), String(email||'').trim(), ph.value, id]);
+    } else if (!ph.keep) {
+      // Staff: name / email / login are managed by the Admin — only the own photo can change here.
+      await dbRun(`UPDATE users SET photo=? WHERE id=?`, [ph.value, id]);
+    }
+    const updated = await dbGet(`SELECT ${USER_COLS} FROM users WHERE id=?`,[id]);
     res.json({ success: true, user: updated });
   } catch (e) {
     res.json({ success: false, message: e.message });
@@ -347,18 +454,20 @@ app.post('/api/users/update', async (req, res) => {
 // ── STAFF: ADD ──────────────────────────────────────────────
 app.post('/api/staff/add', async (req, res) => {
   try {
-    const { name, email, password, photo } = req.body;
+    const { name, email, password, photo } = req.body || {};
     if (!name || !email || !password) return res.json({ success: false, message: 'Name, email, password required hai' });
+    const ph = cleanPhoto(photo);
+    if (!ph.ok) return res.status(400).json({ success: false, message: ph.message });
     if (typeof password !== 'string' || password.length < 8) return res.status(400).json({ success:false, message:'Staff password must be at least 8 characters.' });
 
     const exists = await dbGet(`SELECT id FROM users WHERE LOWER(email)=LOWER(?) LIMIT 1`, [email.trim()]);
     if (exists) return res.json({ success: false, message: 'Yeh email pehle se registered hai' });
 
     const result = await dbRun(
-      `INSERT INTO users (name, email, password, role, photo) VALUES (?,?,?,?,?)`,
-      [name.trim(), email.trim(), auth.hashPassword(password), 'staff', photo||null]
+      `INSERT INTO users (name, email, password, role, photo, active) VALUES (?,?,?,?,?,1)`,
+      [name.trim(), email.trim(), auth.hashPassword(password), 'staff', ph.value]
     );
-    const newUser = await dbGet(`SELECT id,name,email,role,photo FROM users WHERE id=?`,[result.lastID]);
+    const newUser = await dbGet(`SELECT ${USER_COLS} FROM users WHERE id=?`,[result.lastID]);
     res.json({ success: true, user: newUser });
   } catch (e) {
     res.json({ success: false, message: e.message });
@@ -368,18 +477,30 @@ app.post('/api/staff/add', async (req, res) => {
 // ── STAFF: UPDATE ───────────────────────────────────────────
 app.post('/api/staff/update', async (req, res) => {
   try {
-    const { id, name, email, password, photo } = req.body;
+    const { id, name, email, password, photo, active } = req.body || {};
     if (!id) return res.json({ success: false, message: 'id required hai' });
+    const target = await dbGet(`SELECT id, photo FROM users WHERE id=? AND role='staff'`, [id]);
+    if (!target) return res.status(404).json({ success: false, message: 'Staff member nahi mila' });
+    const ph = await photoForUpdate(target.id, photo === undefined ? undefined : (photo || null));
+    if (!ph.ok) return res.status(400).json({ success: false, message: ph.message });
+    const photoVal = ph.keep ? target.photo : ph.value;
 
     if (password && password.trim()) {
       if (password.length < 8) return res.status(400).json({ success:false, message:'Staff password must be at least 8 characters.' });
       await dbRun(`UPDATE users SET name=?, email=?, password=?, photo=? WHERE id=? AND role='staff'`,
-        [name, email, auth.hashPassword(password), photo||null, id]);
+        [name, email, auth.hashPassword(password), photoVal, id]);
+      await dbRun(`DELETE FROM sessions WHERE user_id=?`, [id]);   // new password → old logins end
     } else {
       await dbRun(`UPDATE users SET name=?, email=?, photo=? WHERE id=? AND role='staff'`,
-        [name, email, photo||null, id]);
+        [name, email, photoVal, id]);
     }
-    const updated = await dbGet(`SELECT id,name,email,role,photo FROM users WHERE id=?`,[id]);
+    // Account status: 1 = active, 0 = disabled (cannot log in; open sessions end now)
+    if (active !== undefined) {
+      const on = (active === true || active === 1 || active === '1') ? 1 : 0;
+      await dbRun(`UPDATE users SET active=? WHERE id=? AND role='staff'`, [on, id]);
+      if (!on) await dbRun(`DELETE FROM sessions WHERE user_id=?`, [id]);
+    }
+    const updated = await dbGet(`SELECT ${USER_COLS} FROM users WHERE id=?`,[id]);
     res.json({ success: true, user: updated });
   } catch (e) {
     res.json({ success: false, message: e.message });
@@ -390,7 +511,9 @@ app.post('/api/staff/update', async (req, res) => {
 app.delete('/api/staff/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    // Their orders stay (Admin still sees them under Staff Orders, with the saved creator name).
     await dbRun(`DELETE FROM users WHERE id=? AND role='staff'`, [id]);
+    await dbRun(`DELETE FROM sessions WHERE user_id=?`, [id]).catch(() => {});
     res.json({ success: true });
   } catch (e) {
     res.json({ success: false, message: e.message });
@@ -400,12 +523,21 @@ app.delete('/api/staff/:id', async (req, res) => {
 // ── ORDERS: GET ALL ─────────────────────────────────────────
 app.get('/api/orders', async (req, res) => {
   try {
+    // Admin: all orders. Staff: only their own (filtered in SQL — other rows never leave the server).
+    const scope = orderScope(req.user, 'o');
     const orders = await dbAll(`SELECT o.*, (SELECT COUNT(*) FROM order_screenshots s WHERE s.order_id=o.id) AS screenshot_count
-                                FROM orders o ORDER BY o.id ASC`);
+                                FROM orders o WHERE ${scope.sql} ORDER BY o.id ASC`, scope.params);
     res.json({ success: true, orders });
   } catch (e) {
     res.json({ success: false, message: e.message });
   }
+});
+
+// ── ORDERS: GET ONE (ownership-checked) ─────────────────────
+app.get('/api/orders/:id(\\d+)', requireOrderAccess, async (req, res) => {
+  const order = await dbGet(`SELECT o.*, (SELECT COUNT(*) FROM order_screenshots s WHERE s.order_id=o.id) AS screenshot_count
+                             FROM orders o WHERE o.id=?`, [req.order.id]);
+  res.json({ success: true, order });
 });
 
 // ── ORDERS: ADD (manual form) ───────────────────────────────
@@ -423,9 +555,11 @@ app.post('/api/orders/add', async (req, res) => {
       if (!whatsapp.ok) return res.json({ success: false, code: 'validation', message: whatsapp.message });
     }
     const out = await placeOrder({
-      name, phone, detail, amount, advance, status, assigned_to, tracking_id, date, month, year,
+      name, phone, detail, amount, advance, status, tracking_id, date, month, year,
+      // Staff orders are always assigned to the staff member who placed them
+      assigned_to: isAdmin(req.user) ? assigned_to : req.user.id,
       source: source === 'ai_screenshot' ? 'ai_screenshot' : 'manual',
-    }, { address: cleanAddress(req.body.address), whatsapp });
+    }, { address: cleanAddress(req.body.address), whatsapp, owner: ownerOf(req.user) });
     res.json({ success: true, order: out.order, whatsapp: { started: out.waStarted } });
   } catch (e) {
     console.error('[orders/add]', e.stack || e.message);
@@ -436,10 +570,12 @@ app.post('/api/orders/add', async (req, res) => {
 // ── ORDERS: UPDATE STATUS ───────────────────────────────────
 app.post('/api/orders/status', async (req, res) => {
   try {
-    const { id, status } = req.body;
+    const { id, status } = req.body || {};
     if (!id || !status) return res.json({ success: false, message: 'id aur status required hai' });
-    await dbRun(`UPDATE orders SET status=? WHERE id=?`, [status, id]);
-    const updated = await dbGet(`SELECT * FROM orders WHERE id=?`,[id]);
+    const acc = await orderForUser(req.user, id);
+    if (!acc.order) return res.status(acc.status).json(acc.body);
+    await dbRun(`UPDATE orders SET status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`, [status, acc.order.id]);
+    const updated = await dbGet(`SELECT * FROM orders WHERE id=?`,[acc.order.id]);
     res.json({ success: true, order: updated });
   } catch (e) {
     res.json({ success: false, message: e.message });
@@ -449,16 +585,21 @@ app.post('/api/orders/status', async (req, res) => {
 // ── ORDERS: UPDATE FULL ORDER (Edit modal) ──────────────────
 app.post('/api/orders/update', async (req, res) => {
   try {
-    const { id, name, phone, detail, amount, advance, status, assigned_to, tracking_id } = req.body;
+    const { id, name, phone, detail, amount, advance, status, assigned_to, tracking_id } = req.body || {};
     if (!id || !name || !phone || !amount) return res.json({ success: false, message: 'id, name, phone, amount required hai' });
-    const prevRow = await dbGet(`SELECT tracking_id FROM orders WHERE id=?`, [id]).catch(() => null);
+    const acc = await orderForUser(req.user, id);
+    if (!acc.order) return res.status(acc.status).json(acc.body);
+    const prevRow = acc.order;
+    // created_by_* (the owner) is never part of an edit — it stays with whoever placed the order.
+    // Staff cannot re-assign; the existing assignment is kept.
+    const assign = isAdmin(req.user) ? (assigned_to || 1) : (prevRow.assigned_to || req.user.id);
     await dbRun(
-      `UPDATE orders SET name=?, phone=?, detail=?, amount=?, advance=?, status=?, assigned_to=?, tracking_id=? WHERE id=?`,
-      [name, phone, detail||'', amount, advance||0, status||'Processing', assigned_to||1, tracking_id||'', id]
+      `UPDATE orders SET name=?, phone=?, detail=?, amount=?, advance=?, status=?, assigned_to=?, tracking_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+      [name, phone, detail||'', amount, advance||0, status||'Processing', assign, tracking_id||'', prevRow.id]
     );
-    await recordShipment(id, prevRow && prevRow.tracking_id, tracking_id)
+    await recordShipment(prevRow.id, prevRow.tracking_id, tracking_id)
       .catch(e => console.warn(`[orders/update] #${id} shipped_date save fail:`, e.message));
-    const updated = await dbGet(`SELECT * FROM orders WHERE id=?`, [id]);
+    const updated = await dbGet(`SELECT * FROM orders WHERE id=?`, [prevRow.id]);
     res.json({ success: true, order: updated });
   } catch (e) {
     res.json({ success: false, message: e.message });
@@ -468,6 +609,7 @@ app.post('/api/orders/update', async (req, res) => {
 // ── ORDERS: DELETE ──────────────────────────────────────────
 app.delete('/api/orders/:id', async (req, res) => {
   try {
+    if (!isAdmin(req.user)) return res.status(403).json({ success: false, message: 'Owner access only' });   // also blocked in auth.js
     const id = parseInt(req.params.id);
     const shotRows = await dbAll(`SELECT file_name FROM order_screenshots WHERE order_id=?`, [id]).catch(() => []);
     await dbRun(`DELETE FROM orders WHERE id=?`, [id]);
@@ -482,10 +624,90 @@ app.delete('/api/orders/:id', async (req, res) => {
   }
 });
 
+// ════════════════════════════════════════════════════════════
+//  👥 ADMIN — STAFF ORDERS (owner only; also blocked for staff in auth.js)
+//  GET /api/staff-orders?staff=<id|all>&status=<all|Processing|Delivered|Return|Paid|Unpaid>
+//                        &from=YYYY-MM-DD&to=YYYY-MM-DD&q=<order id | customer | phone | tracking>
+//  Only orders placed by Staff (created_by_role='staff'). Admin's own orders are never mixed in.
+//  overall + perStaff follow the date range only; the list follows every filter combined.
+// ════════════════════════════════════════════════════════════
+const ORDER_DAY = `COALESCE(NULLIF(o.placed_date, ''), SUBSTR(CAST(o.created_at AS TEXT), 1, 10))`;
+const STAT_COLS = `COUNT(*) AS total,
+  SUM(CASE WHEN o.status = 'Processing' THEN 1 ELSE 0 END) AS pending,
+  SUM(CASE WHEN o.status = 'Delivered'  THEN 1 ELSE 0 END) AS delivered,
+  SUM(CASE WHEN o.status = 'Return'     THEN 1 ELSE 0 END) AS returned,
+  SUM(CASE WHEN o.status = 'Paid'       THEN 1 ELSE 0 END) AS paid,
+  SUM(CASE WHEN o.status = 'Paid' THEN 0 ELSE 1 END)       AS unpaid,
+  COALESCE(SUM(o.amount), 0) AS amount`;
+const statNums = r => ({
+  total: Number(r && r.total) || 0, pending: Number(r && r.pending) || 0, delivered: Number(r && r.delivered) || 0,
+  returned: Number(r && r.returned) || 0, paid: Number(r && r.paid) || 0, unpaid: Number(r && r.unpaid) || 0,
+  amount: Number(r && r.amount) || 0,
+});
+const isoDay = v => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) ? v : null;
+
+app.get('/api/staff-orders', async (req, res) => {
+  try {
+    if (!isAdmin(req.user)) return res.status(403).json({ success: false, message: 'Owner access only' });
+    const qy = req.query || {};
+    const from = isoDay(qy.from), to = isoDay(qy.to);
+    const base = [`o.created_by_role = 'staff'`], baseP = [];
+    if (from) { base.push(`${ORDER_DAY} >= ?`); baseP.push(from); }
+    if (to)   { base.push(`${ORDER_DAY} <= ?`); baseP.push(to); }
+
+    const overall = statNums(await dbGet(`SELECT ${STAT_COLS} FROM orders o WHERE ${base.join(' AND ')}`, baseP));
+    const grouped = await dbAll(`SELECT o.created_by_user_id AS uid, MAX(o.created_by_name) AS saved_name, ${STAT_COLS}
+                                 FROM orders o WHERE ${base.join(' AND ')} GROUP BY o.created_by_user_id`, baseP);
+    const staffUsers = await dbAll(`SELECT id, name, email, photo, COALESCE(active, 1) AS active FROM users WHERE role='staff' ORDER BY name ASC`);
+    const byId = new Map(grouped.map(g => [Number(g.uid), g]));
+    const perStaff = staffUsers.map(u => ({ id: u.id, name: u.name, email: u.email, photo: u.photo || null,
+      active: Number(u.active) !== 0, deleted: false, ...statNums(byId.get(Number(u.id))) }));
+    for (const g of grouped) {          // staff accounts deleted later — their orders are still listed
+      if (!staffUsers.some(u => Number(u.id) === Number(g.uid)))
+        perStaff.push({ id: Number(g.uid), name: g.saved_name || `Staff #${g.uid}`, email: '', photo: null, active: false, deleted: true, ...statNums(g) });
+    }
+
+    const where = [...base], params = [...baseP];
+    const staffId = Number(qy.staff);
+    if (qy.staff && qy.staff !== 'all') {
+      if (!Number.isInteger(staffId) || staffId <= 0) return res.status(400).json({ success: false, message: 'Invalid staff filter' });
+      where.push(`o.created_by_user_id = ?`); params.push(staffId);
+    }
+    const st = String(qy.status || 'all');
+    if (st === 'Unpaid') where.push(`o.status <> 'Paid'`);
+    else if (['Processing', 'Delivered', 'Return', 'Paid', 'Cancelled'].includes(st)) { where.push(`o.status = ?`); params.push(st); }
+    const q = String(qy.q || '').trim().slice(0, 80);
+    if (q) {
+      const like = '%' + q.toLowerCase().replace(/[%_\\]/g, '') + '%';
+      const digits = q.replace(/\D/g, '');
+      const idMatch = /^(?:#|MA-\d{4}-)?(\d{1,9})$/i.exec(q);
+      const ors = [`LOWER(o.name) LIKE ?`, `LOWER(o.phone) LIKE ?`, `LOWER(COALESCE(o.tracking_id, '')) LIKE ?`];
+      params.push(like, like, like);
+      if (digits.length >= 4) { ors.push(`REPLACE(REPLACE(o.phone, '-', ''), ' ', '') LIKE ?`); params.push('%' + digits + '%'); }
+      if (idMatch) { ors.push(`o.id = ?`); params.push(Number(idMatch[1])); }
+      where.push('(' + ors.join(' OR ') + ')');
+    }
+    const LIMIT = 1000;
+    const orders = await dbAll(`SELECT o.*, ${ORDER_DAY} AS order_day,
+                                       COALESCE(u.name, o.created_by_name) AS created_by_display,
+                                       (SELECT COUNT(*) FROM order_screenshots s WHERE s.order_id=o.id) AS screenshot_count
+                                FROM orders o LEFT JOIN users u ON u.id = o.created_by_user_id
+                                WHERE ${where.join(' AND ')} ORDER BY o.id DESC LIMIT ${LIMIT}`, params);
+    res.json({ success: true, overall, perStaff, orders, limited: orders.length >= LIMIT });
+  } catch (e) {
+    console.error('[staff-orders]', e.message);
+    res.status(500).json({ success: false, message: 'Staff orders load nahi huay' });
+  }
+});
+
 // ── SETTINGS: GET ───────────────────────────────────────────
 app.get('/api/settings', async (req, res) => {
   try {
-    const rows = await dbAll(`SELECT key, value FROM settings`);
+    // Staff only get the branding they need to render the CRM — never admin settings.
+    const STAFF_SETTINGS = ['macrm_logo', 'macrm_store_name', 'macrm_report_logo'];
+    const rows = isAdmin(req.user)
+      ? await dbAll(`SELECT key, value FROM settings`)
+      : await dbAll(`SELECT key, value FROM settings WHERE key IN (${STAFF_SETTINGS.map(() => '?').join(',')})`, STAFF_SETTINGS);
     const settings = {};
     rows.forEach(r => settings[r.key] = r.value);
     res.json({ success: true, settings });
@@ -897,17 +1119,17 @@ app.post('/api/screenshots/temp', express.raw({ type: () => true, limit: '25mb' 
   }
 });
 
-app.get('/api/orders/:id/screenshots', async (req, res) => {
+app.get('/api/orders/:id/screenshots', requireOrderAccess, async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = req.order.id;
     const rows = await dbAll(`SELECT id, position, original_name, mime, bytes FROM order_screenshots WHERE order_id=? ORDER BY position ASC`, [id]);
     res.json({ success: true, screenshots: rows.map(r => ({ ...r, url: `/api/orders/${id}/screenshots/${r.id}/file` })) });
   } catch (e) { res.json({ success: false, message: e.message }); }
 });
 
-app.get('/api/orders/:id/screenshots/:sid/file', async (req, res) => {
+app.get('/api/orders/:id/screenshots/:sid/file', requireOrderAccess, async (req, res) => {
   try {
-    const row = await dbGet(`SELECT file_name, mime FROM order_screenshots WHERE id=? AND order_id=?`, [parseInt(req.params.sid), parseInt(req.params.id)]);
+    const row = await dbGet(`SELECT file_name, mime FROM order_screenshots WHERE id=? AND order_id=?`, [parseInt(req.params.sid), req.order.id]);
     if (!row) return res.status(404).json({ success: false, message: 'Screenshot nahi mila' });
     if (!(await storage.ensureLocal(SS_ROOT, row.file_name))) return res.status(404).json({ success: false, message: 'Screenshot file nahi mili' });
     res.type(row.mime).sendFile(path.join(SS_ROOT, row.file_name));
@@ -965,7 +1187,7 @@ function vplNumber(o) {
 // Orders that qualify TODAY: VPL tracking + shipped date + EXACTLY 3 days + reminder not sent yet.
 async function findVplDue(today = localISODate()) {
   const rows = await dbAll(
-    `SELECT id, name, phone, wa_phone, status, tracking_id, shipped_date FROM orders
+    `SELECT id, name, phone, wa_phone, status, tracking_id, shipped_date, created_by_user_id FROM orders
       WHERE shipped_date IS NOT NULL AND shipped_date <> ''
         AND COALESCE(vpl_reminder_sent, 0) = 0
         AND vpl_reminder_error IS NULL
@@ -1019,7 +1241,7 @@ async function runVplReminders(trigger) {
 // What would be sent today (read-only, sends nothing) — handy for checking.
 app.get('/api/vpl-reminders/due', async (req, res) => {
   try {
-    const due = await findVplDue();
+    const due = (await findVplDue()).filter(o => isAdmin(req.user) || canAccessOrder(req.user, o));
     res.json({ success: true, today: localISODate(), count: due.length,
       orders: due.map(o => ({ id: o.id, name: o.name, shipped_date: o.shipped_date, whatsapp_ok: !!vplNumber(o) })) });
   } catch (e) { res.json({ success: false, message: e.message }); }
@@ -1070,16 +1292,19 @@ async function checkWhatsAppOrder({ waIn, phones, lines }) {
 
 // Saves the order. With `whatsapp` (from checkWhatsAppOrder) it also attaches the original
 // screenshots, freezes the order data, and — only after all of that is committed — starts WhatsApp.
-async function placeOrder(row, { address = '', whatsapp = null } = {}) {
+async function placeOrder(row, { address = '', whatsapp = null, owner = null } = {}) {
+  if (!owner || !owner.id || !['admin', 'staff'].includes(owner.role)) throw new Error('Order owner missing');   // every new order has an owner
   let orderId = null;
   const moved = [];
   try {
     const r = await dbRun(
-      `INSERT INTO orders (name,phone,detail,amount,advance,status,assigned_to,tracking_id,date,month,year,client_id,source,address,workflow_state,wa_phone)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO orders (name,phone,detail,amount,advance,status,assigned_to,tracking_id,date,month,year,client_id,source,address,workflow_state,wa_phone,
+                           created_by_user_id,created_by_role,created_by_name,updated_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)`,
       [row.name, row.phone, row.detail || '', row.amount, row.advance || 0, row.status || 'Processing', row.assigned_to || 1,
        row.tracking_id || '', row.date, row.month, row.year, null, row.source || 'manual',
-       address, whatsapp ? 'ORDER_PLACED' : null, whatsapp ? whatsapp.wa.number : null]);
+       address, whatsapp ? 'ORDER_PLACED' : null, whatsapp ? whatsapp.wa.number : null,
+       owner.id, owner.role, String(owner.name || '').slice(0, 120)]);
     orderId = r.lastID;
 
     // Order Placed Date — stamped by the server at the moment of placement. Failure here never blocks the order.
@@ -1159,7 +1384,9 @@ app.post('/api/clients/save', async (req, res) => {
     }
 
     let assignedTo;
-    if (order.assigned_to) {
+    if (!isAdmin(req.user)) {
+      assignedTo = req.user.id;                     // Staff orders belong to / are assigned to the staff member
+    } else if (order.assigned_to) {
       const u = await dbGet(`SELECT id FROM users WHERE id=?`, [order.assigned_to]);
       if (!u) return saveFail(res, 'Selected staff member was not found');
       assignedTo = u.id;
@@ -1172,7 +1399,7 @@ app.post('/api/clients/save', async (req, res) => {
       name: client.name, phone: client.phone, detail: order.detail, amount: order.amount, advance: order.advance,
       status: order.status, assigned_to: assignedTo, tracking_id: order.tracking_id,
       date: order.date_label || parts.label, month: parts.month, year: parts.year, source,
-    }, { address: cleanAddress(req.body.client && req.body.client.address), whatsapp });
+    }, { address: cleanAddress(req.body.client && req.body.client.address), whatsapp, owner: ownerOf(req.user) });
     res.json({ success: true, order: out.order, whatsapp: { started: out.waStarted } });
   } catch (e) {
     console.error('[clients/save]', e.stack || e.message);
@@ -1184,24 +1411,24 @@ app.post('/api/clients/save', async (req, res) => {
 //  💬 WHATSAPP — status, retry, session (QR link)
 //  None of these can create an order.
 // ════════════════════════════════════════════════════════════
-app.get('/api/orders/:id/whatsapp', async (req, res) => {
+app.get('/api/orders/:id/whatsapp', requireOrderAccess, async (req, res) => {
   try {
-    const st = await waFlow.getStatus(parseInt(req.params.id));
+    const st = await waFlow.getStatus(req.order.id);
     if (!st) return res.json({ success: false, code: 'not_found', message: 'Order nahi mila' });
     res.json({ success: true, whatsapp: st });
   } catch (e) { res.json({ success: false, message: e.message }); }
 });
 
-app.post('/api/orders/:id/whatsapp/retry', async (req, res) => {
+app.post('/api/orders/:id/whatsapp/retry', requireOrderAccess, async (req, res) => {
   try {
-    const out = await waFlow.retry(parseInt(req.params.id), { standard: !!(req.body && req.body.standard) });
+    const out = await waFlow.retry(req.order.id, { standard: !!(req.body && req.body.standard) });
     res.json(out.ok ? { success: true } : { success: false, code: out.code, message: out.message });
   } catch (e) { res.json({ success: false, message: e.message }); }
 });
 
-app.post('/api/orders/:id/whatsapp/mark-sent', async (req, res) => {
+app.post('/api/orders/:id/whatsapp/mark-sent', requireOrderAccess, async (req, res) => {
   try {
-    const ok = await waFlow.markSent(parseInt(req.params.id));
+    const ok = await waFlow.markSent(req.order.id);
     res.json(ok ? { success: true } : { success: false, message: 'Sirf failed WhatsApp ko "sent" mark kar saktay hain' });
   } catch (e) { res.json({ success: false, message: e.message }); }
 });
