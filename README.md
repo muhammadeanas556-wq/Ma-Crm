@@ -2,6 +2,14 @@
 
 This package includes the user-supplied CRM frontend, monthly report, Express/SQLite backend, AI extraction helpers, and WhatsApp browser extension. It was prepared for Node hosting; uploading to GitHub **does not** put the CRM online by itself.
 
+## Deploy on Render + Supabase (recommended — no paid disk needed)
+
+1. Supabase: create a project and a **private** Storage bucket named `crm-files`.
+2. Render → Environment: `DATABASE_URL` (Supabase **Session pooler** string), `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` (secret key), `ADMIN_EMAIL`, `ADMIN_PASSWORD` (12+ chars), `NODE_ENV=production`, `TZ=Asia/Karachi`; optionally `GEMINI_API_KEY`, `WA_BRIDGE_TOKEN`.
+3. Deploy. Tables are created automatically; the first admin comes from `ADMIN_EMAIL`/`ADMIN_PASSWORD`.
+4. Orders, users, logo, profile photos and settings live in Supabase Postgres; placed-order screenshots are copied to the `crm-files` bucket. Redeploys no longer erase them. `DATA_DIR` is not needed.
+5. Without `DATABASE_URL` the app falls back to a local SQLite file (needs a persistent disk).
+
 ## Deploy on Railway (or another Node.js host with persistent storage)
 
 1. Create a **private** GitHub repository (this CRM contains private business application code). Extract this ZIP first; extract the ZIP and upload the **extracted files** at the repository root, not the ZIP file itself. Never upload your real `env` file or database.

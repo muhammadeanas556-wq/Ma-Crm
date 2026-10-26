@@ -23,7 +23,7 @@ const sender = require('./whatsapp-sender');
 const STEPS = ['message', 'phone', 'open', 'chat', 'attach', 'send'];
 const ACTIVE = ['pending', 'processing', 'opening'];   // 'opening' = older CRM versions
 
-module.exports = function createWorkflow({ dbRun, dbGet, dbAll, screenshotRoot, gemini }) {
+module.exports = function createWorkflow({ dbRun, dbGet, dbAll, screenshotRoot, gemini, ensureFile }) {
   const running = new Set();   // in-process guard; the DB compare-and-set below is the real lock
 
   // ── helpers ───────────────────────────────────────────────
@@ -256,6 +256,8 @@ module.exports = function createWorkflow({ dbRun, dbGet, dbAll, screenshotRoot, 
       if (claim.changes !== 1) return;
 
       const shots = await dbAll(`SELECT * FROM order_screenshots WHERE order_id=? ORDER BY position ASC`, [id]);
+      // Screenshot files can be gone after a redeploy — restore them from permanent storage first.
+      if (ensureFile) for (const s of shots) await ensureFile(s.file_name).catch(e => console.warn(`[WhatsApp] order #${id} screenshot restore:`, e.message));
       const files = shots.map(s => ({
         path: path.join(screenshotRoot, s.file_name), mime: s.mime, sha256: s.sha256,
         name: s.original_name || path.basename(s.file_name),

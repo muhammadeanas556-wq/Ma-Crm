@@ -49,7 +49,7 @@ module.exports = function createAuth({ dbRun, dbGet }) {
   async function init() {
     await dbRun(`CREATE TABLE IF NOT EXISTS sessions (
       token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL, role TEXT NOT NULL,
-      created INTEGER NOT NULL, last_seen INTEGER NOT NULL)`);
+      created BIGINT NOT NULL, last_seen BIGINT NOT NULL)`);
     await dbRun(`DELETE FROM sessions WHERE created < ? OR last_seen < ?`, [Date.now() - MAX_MS, Date.now() - IDLE_MS]);
   }
 

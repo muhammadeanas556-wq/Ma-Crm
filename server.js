@@ -109,24 +109,17 @@ app.get('/report', (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ── DATABASE SETUP ──────────────────────────────────────────
-const DB_PATH = path.join(DATA_DIR, 'macrm.db');
-const db = new sqlite3.Database(DB_PATH, err => {
-  if (err) { console.error('❌ DB Error:', err.message); process.exit(1); }
-  console.log('✅ SQLite connected →', DB_PATH);
-});
-
-const dbRun  = (sql, p=[]) => new Promise((res,rej) => db.run(sql,p, function(e){ e?rej(e):res(this); }));
-const dbGet  = (sql, p=[]) => new Promise((res,rej) => db.get(sql,p, (e,r)   => e?rej(e):res(r)));
-const dbAll  = (sql, p=[]) => new Promise((res,rej) => db.all(sql,p, (e,r)   => e?rej(e):res(r)));
+// DATABASE_URL set → Supabase Postgres (permanent). Not set → local SQLite file.
+const DB = require('./db')({ dataDir: DATA_DIR });
+const { dbRun, dbGet, dbAll, t: T } = DB;
+console.log('✅ Database engine →', DB.label);
 
 const auth = require('./auth')({ dbRun, dbGet });
 // Public access is protected with cookie sessions; turn on private networking explicitly if desired.
 if (process.env.CRM_PRIVATE_NETWORK === '1') app.use(auth.network);
 app.use(auth.gate);
 // Adds a column to an existing database; "already exists" is the normal case and is ignored.
-const addColumn = (table, def) => dbRun(`ALTER TABLE ${table} ADD COLUMN ${def}`).catch(e => {
-  if (!/duplicate column/i.test(e.message)) console.warn(`⚠ Column "${def}" add nahi hua:`, e.message);
-});
+const addColumn = (table, def) => DB.addColumn(table, def).catch(e => console.warn(`⚠ Column "${def}" add nahi hua:`, e.message));
 
 // ── ORIGINAL ORDER SCREENSHOTS (stored byte-for-byte, never resized) ──
 // order-screenshots/tmp/<id>      uploaded, order not placed yet (auto-deleted after 24h)
@@ -136,9 +129,13 @@ const SS_TMP  = path.join(SS_ROOT, 'tmp');
 fs.mkdirSync(SS_TMP, { recursive: true });
 fs.mkdirSync(path.join(SS_ROOT, 'orders'), { recursive: true });
 
+const storage = require('./storage')();
+console.log('✅ Screenshot storage →', storage.enabled ? `Supabase bucket "${storage.bucket}" (permanent)` : 'local disk only (set SUPABASE_URL + SUPABASE_SERVICE_KEY for permanent copies)');
+
 const waFlow = createWaFlow({
   dbRun, dbGet, dbAll,
   screenshotRoot: SS_ROOT,
+  ensureFile: fileName => storage.ensureLocal(SS_ROOT, fileName),
   gemini: {
     apiKey: GEMINI_API_KEY || GEMINI_KEYS[0] || '',
     apiKeys: GEMINI_KEYS,
@@ -153,35 +150,35 @@ const BUSINESS_NAME = (process.env.BUSINESS_NAME || '').trim();
 
 // ── CREATE TABLES ───────────────────────────────────────────
 async function initDB() {
-  await dbRun(`PRAGMA journal_mode=WAL`);
+  await DB.init();
 
   await dbRun(`
     CREATE TABLE IF NOT EXISTS users (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      id         ${T.id},
       name       TEXT    NOT NULL,
       email      TEXT    UNIQUE NOT NULL,
       password   TEXT    NOT NULL,
       role       TEXT    DEFAULT 'staff',
       photo      TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at ${T.ts} DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
   await dbRun(`
     CREATE TABLE IF NOT EXISTS orders (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      id          ${T.id},
       name        TEXT    NOT NULL,
       phone       TEXT    NOT NULL,
       detail      TEXT    DEFAULT '',
-      amount      REAL    NOT NULL,
-      advance     REAL    DEFAULT 0,
+      amount      ${T.real} NOT NULL,
+      advance     ${T.real} DEFAULT 0,
       status      TEXT    DEFAULT 'Processing',
       assigned_to INTEGER DEFAULT 1,
       tracking_id TEXT    DEFAULT '',
       date        TEXT    NOT NULL,
       month       INTEGER NOT NULL,
       year        INTEGER NOT NULL,
-      created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at  ${T.ts} DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
@@ -193,14 +190,14 @@ async function initDB() {
   // source defaults to 'manual' for every row that already exists.
   await dbRun(`
     CREATE TABLE IF NOT EXISTS clients (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      id         ${T.id},
       name       TEXT    NOT NULL,
       phone      TEXT    DEFAULT '',
       email      TEXT    DEFAULT '',
       address    TEXT    DEFAULT '',
       notes      TEXT    DEFAULT '',
       source     TEXT    DEFAULT 'manual',
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at ${T.ts} DEFAULT CURRENT_TIMESTAMP
     )
   `);
   await addColumn('orders', `client_id INTEGER`);
@@ -217,7 +214,7 @@ async function initDB() {
     `wa_message_source TEXT`,       // gemini | standard | manual
     `wa_step TEXT`, `wa_progress TEXT`, `wa_error TEXT`, `wa_error_code TEXT`,
     `wa_parts_sent INTEGER DEFAULT 0`, `wa_attempts INTEGER DEFAULT 0`,
-    `wa_started_at DATETIME`, `wa_sent_at DATETIME`,
+    `wa_started_at ${T.ts}`, `wa_sent_at ${T.ts}`,
   ]) await addColumn('orders', col);
 
   // Order Placed Date + VPL 3-day reminder. Purely additive: every existing order keeps
@@ -226,13 +223,13 @@ async function initDB() {
     `placed_date TEXT`,                       // YYYY-MM-DD, stamped by the server when the order is placed
     `shipped_date TEXT`,                      // YYYY-MM-DD, stamped when a VPL tracking ID is first saved
     `vpl_reminder_sent INTEGER DEFAULT 0`,    // 0 = NO, 1 = YES
-    `vpl_reminder_sent_at DATETIME`,
+    `vpl_reminder_sent_at ${T.ts}`,
     `vpl_reminder_error TEXT`,                // only set when a send's outcome is unknown (never auto-retried)
   ]) await addColumn('orders', col);
 
   await dbRun(`
     CREATE TABLE IF NOT EXISTS order_screenshots (
-      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      id            ${T.id},
       order_id      INTEGER NOT NULL,
       position      INTEGER NOT NULL,
       file_name     TEXT    NOT NULL,
@@ -240,7 +237,7 @@ async function initDB() {
       mime          TEXT    NOT NULL,
       bytes         INTEGER NOT NULL,
       sha256        TEXT    NOT NULL,
-      created_at    DATETIME DEFAULT CURRENT_TIMESTAMP
+      created_at    ${T.ts} DEFAULT CURRENT_TIMESTAMP
     )
   `);
   await dbRun(`CREATE INDEX IF NOT EXISTS idx_order_screenshots_order ON order_screenshots(order_id)`);
@@ -470,7 +467,9 @@ app.post('/api/orders/update', async (req, res) => {
 app.delete('/api/orders/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const shotRows = await dbAll(`SELECT file_name FROM order_screenshots WHERE order_id=?`, [id]).catch(() => []);
     await dbRun(`DELETE FROM orders WHERE id=?`, [id]);
+    storage.remove(shotRows.map(r => r.file_name)).catch(e => console.warn('[storage] cleanup:', e.message));
     await dbRun(`DELETE FROM order_screenshots WHERE order_id=?`, [id])
       .catch(e => console.warn(`[orders/delete] #${id} screenshot rows:`, e.message));
     if (Number.isInteger(id) && id > 0) fs.rm(path.join(SS_ROOT, 'orders', String(id)), { recursive: true, force: true },
@@ -498,7 +497,7 @@ app.post('/api/settings/set', async (req, res) => {
   try {
     const { key, value } = req.body;
     if (!key) return res.json({ success: false, message: 'key required hai' });
-    await dbRun(`INSERT OR REPLACE INTO settings (key,value) VALUES (?,?)`, [key, value||'']);
+    await dbRun(`INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT (key) DO UPDATE SET value=excluded.value`, [key, value||'']);
     res.json({ success: true });
   } catch (e) {
     res.json({ success: false, message: e.message });
@@ -523,12 +522,12 @@ app.get('/api/report/:year/:month', async (req, res) => {
     // ── Summary stats ───────────────────────────────────────
     const summary = await dbGet(`
       SELECT
-        COUNT(*)                                                        AS totalOrders,
-        COUNT(DISTINCT name || phone)                                   AS totalClients,
+        COUNT(*)                                                        AS "totalOrders",
+        COUNT(DISTINCT name || phone)                                   AS "totalClients",
         SUM(CASE WHEN status IN ('Delivered','delivered') THEN 1 ELSE 0 END) AS delivered,
         SUM(CASE WHEN status IN ('Cancelled','cancelled') THEN 1 ELSE 0 END) AS cancelled,
         SUM(CASE WHEN status IN ('Processing','processing','Paid') THEN 1 ELSE 0 END) AS processing,
-        COALESCE(SUM(amount), 0)                                        AS totalRevenue,
+        COALESCE(SUM(amount), 0)                                        AS "totalRevenue",
         COALESCE(SUM(advance), 0)                                       AS received,
         COALESCE(SUM(amount) - SUM(advance), 0)                        AS pending
       FROM orders
@@ -539,7 +538,7 @@ app.get('/api/report/:year/:month', async (req, res) => {
     const orders = await dbAll(`
       SELECT
         o.id,
-        o.name        AS clientName,
+        o.name        AS "clientName",
         o.phone,
         o.detail      AS product,
         o.status,
@@ -548,7 +547,7 @@ app.get('/api/report/:year/:month', async (req, res) => {
         (o.amount - o.advance) AS remaining,
         o.tracking_id,
         o.date,
-        u.name        AS assignedTo
+        u.name        AS "assignedTo"
       FROM orders o
       LEFT JOIN users u ON o.assigned_to = u.id
       WHERE o.month = ? AND o.year = ?
@@ -558,16 +557,16 @@ app.get('/api/report/:year/:month', async (req, res) => {
     // ── Per-client aggregation ──────────────────────────────
     const clients = await dbAll(`
       SELECT
-        name                     AS clientName,
+        name                     AS "clientName",
         phone,
-        COUNT(*)                 AS totalOrders,
-        COALESCE(SUM(amount), 0) AS totalSpend,
-        COALESCE(SUM(advance), 0) AS totalPaid,
-        COALESCE(SUM(amount) - SUM(advance), 0) AS totalPending
+        COUNT(*)                 AS "totalOrders",
+        COALESCE(SUM(amount), 0) AS "totalSpend",
+        COALESCE(SUM(advance), 0) AS "totalPaid",
+        COALESCE(SUM(amount) - SUM(advance), 0) AS "totalPending"
       FROM orders
       WHERE month = ? AND year = ?
       GROUP BY name, phone
-      ORDER BY totalSpend DESC
+      ORDER BY "totalSpend" DESC
     `, [dbMonth, year]);
 
     res.json({
@@ -586,7 +585,7 @@ app.get('/api/report/:year/:month', async (req, res) => {
 app.get('/api/report/months', async (req, res) => {
   try {
     const months = await dbAll(`
-      SELECT DISTINCT month, year, COUNT(*) as orderCount
+      SELECT DISTINCT month, year, COUNT(*) as "orderCount"
       FROM orders
       GROUP BY year, month
       ORDER BY year DESC, month DESC
@@ -908,6 +907,7 @@ app.get('/api/orders/:id/screenshots/:sid/file', async (req, res) => {
   try {
     const row = await dbGet(`SELECT file_name, mime FROM order_screenshots WHERE id=? AND order_id=?`, [parseInt(req.params.sid), parseInt(req.params.id)]);
     if (!row) return res.status(404).json({ success: false, message: 'Screenshot nahi mila' });
+    if (!(await storage.ensureLocal(SS_ROOT, row.file_name))) return res.status(404).json({ success: false, message: 'Screenshot file nahi mili' });
     res.type(row.mime).sendFile(path.join(SS_ROOT, row.file_name));
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -1094,7 +1094,11 @@ async function placeOrder(row, { address = '', whatsapp = null } = {}) {
         const dest = path.join(dir, sid);
         await fs.promises.rename(file, dest);          // moved, never copied / re-encoded
         moved.push({ from: file, to: dest });
-        if (sha256(await fs.promises.readFile(dest)) !== meta.sha256) throw new Error(`Screenshot ${i + 1} file kharab hai`);
+        const bytes = await fs.promises.readFile(dest);
+        if (sha256(bytes) !== meta.sha256) throw new Error(`Screenshot ${i + 1} file kharab hai`);
+        // Permanent copy in Supabase Storage. If it fails the whole order is undone (nothing half-saved).
+        try { await storage.put(`orders/${orderId}/${sid}`, bytes, meta.mime); }
+        catch (se) { throw new Error('Screenshot permanent storage mein save nahi hua: ' + se.message); }
         await dbRun(
           `INSERT INTO order_screenshots (order_id, position, file_name, original_name, mime, bytes, sha256) VALUES (?,?,?,?,?,?,?)`,
           [orderId, i, `orders/${orderId}/${sid}`, meta.name || '', meta.mime, meta.bytes, meta.sha256]);
@@ -1239,6 +1243,19 @@ app.get('/api/wa-bridge/jobs/:id/files/:index', (req, res) => {
 app.post('/api/whatsapp/session/logout', async (req, res) => {
   try { res.json({ success: true, session: await waSender.logout() }); }
   catch (e) { res.json({ success: false, message: e.message }); }
+});
+
+// ── BACKUP (owner only — gate in auth.js) ──────────────────
+// Supabase keeps its own backups; SQLite mode writes a consistent copy next to the database.
+app.post('/api/backup', async (req, res) => {
+  try {
+    if (DB.engine === 'postgres')
+      return res.json({ success: false, message: 'Database Supabase par hai — backups Supabase dashboard (Database → Backups) mein hotay hain.' });
+    const file = `macrm-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.db`;
+    fs.mkdirSync(path.join(DATA_DIR, 'backups'), { recursive: true });
+    await dbRun(`VACUUM INTO '${path.join(DATA_DIR, 'backups', file).replace(/'/g, "''")}'`);
+    res.json({ success: true, backup: { file } });
+  } catch (e) { res.json({ success: false, message: e.message }); }
 });
 
 // ── HEALTH CHECK ────────────────────────────────────────────
