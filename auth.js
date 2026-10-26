@@ -10,7 +10,7 @@ const IDLE_MS = (Number(process.env.SESSION_IDLE_DAYS) || 7)  * 864e5;   // logg
 const MAX_MS  = (Number(process.env.SESSION_MAX_DAYS)  || 30) * 864e5;   // hard limit, then log in again
 const PUBLIC_API = new Set(['/api/login', '/api/health']);
 // Owner (role 'admin') only
-const OWNER_ONLY = [/^\/api\/settings\/set/, /^\/api\/staff(\/|$)/, /^\/api\/whatsapp\/session\/logout/, /^\/api\/backup/, /^\/api\/users\/update/, /^\/api\/change-password/];
+const OWNER_ONLY = [/^\/api\/settings\/set/, /^\/api\/staff(\/|$)/, /^\/api\/whatsapp\/session\/logout/, /^\/api\/backup/, /^\/api\/users\/update/, /^\/api\/change-password/, /^\/api\/orders\/\d+$/, /^\/api\/report(\/|$)/];
 
 const sha = s => crypto.createHash('sha256').update(s).digest('hex');
 const clean = ip => String(ip || '').replace(/^::ffff:/, '');
