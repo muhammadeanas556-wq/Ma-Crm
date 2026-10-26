@@ -5,12 +5,13 @@
 //  (token stored only as a SHA-256 hash) so they survive restarts.
 // ════════════════════════════════════════════════════════════
 const crypto = require('crypto');
+const rbac = require('./rbac');
 
 const IDLE_MS = (Number(process.env.SESSION_IDLE_DAYS) || 7)  * 864e5;   // logged out after N idle days
 const MAX_MS  = (Number(process.env.SESSION_MAX_DAYS)  || 30) * 864e5;   // hard limit, then log in again
 const PUBLIC_API = new Set(['/api/login', '/api/health']);
 // Owner (role 'admin') only
-const OWNER_ONLY = [/^\/api\/settings\/set/, /^\/api\/staff(\/|$)/, /^\/api\/whatsapp\/session\/logout/, /^\/api\/backup/, /^\/api\/users\/update/, /^\/api\/change-password/, /^\/api\/orders\/\d+$/, /^\/api\/report(\/|$)/];
+const OWNER_ONLY = [/^\/api\/settings\/set/, /^\/api\/staff(\/|$)/, /^\/api\/whatsapp\/session\/logout/, /^\/api\/backup/, /^\/api\/users\/update/, /^\/api\/change-password/, /^\/api\/orders\/\d+$/, /^\/api\/report(\/|$)/, /^\/api\/staff-orders(\/|$)/];
 
 const sha = s => crypto.createHash('sha256').update(s).digest('hex');
 const clean = ip => String(ip || '').replace(/^::ffff:/, '');
@@ -65,7 +66,7 @@ module.exports = function createAuth({ dbRun, dbGet }) {
   }
   async function sessionOf(req) {
     const t = cookieOf(req, 'crm_sid'); if (!t) return null;
-    const s = await dbGet(`SELECT s.user_id, u.role, u.name, u.email, s.created, s.last_seen
+    const s = await dbGet(`SELECT s.user_id, u.role, u.name, u.email, u.permissions, s.created, s.last_seen
                            FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash=?`, [sha(t)]);
     const now = Date.now();
     if (!s || now - s.created > MAX_MS || now - s.last_seen > IDLE_MS) {
@@ -73,7 +74,9 @@ module.exports = function createAuth({ dbRun, dbGet }) {
       return null;
     }
     if (now - s.last_seen > 60000) dbRun(`UPDATE sessions SET last_seen=? WHERE token_hash=?`, [now, sha(t)]).catch(() => {});
-    return { id: s.user_id, role: s.role, name: s.name, email: s.email };   // role comes from the DB, never from the browser
+    // role + permissions come from the DB on every request, never from the browser
+    return { id: s.user_id, role: s.role, name: s.name, email: s.email,
+             permissions: s.role === 'admin' ? null : rbac.parse(s.permissions) };
   }
 
   // 1) only this PC + your Tailscale network may connect
@@ -106,6 +109,8 @@ module.exports = function createAuth({ dbRun, dbGet }) {
       const user = await sessionOf(req);
       if (!user) return deny(res, 401, 'Session expired. Please sign in again.');
       if (user.role !== 'admin' && OWNER_ONLY.some(r => r.test(path))) return deny(res, 403, 'Owner access only');
+      // Staff: default-deny route table + the account's own permissions (rbac.js)
+      if (!rbac.routeAllowed(user, req.method, path)) return deny(res, 403, 'Aap ko is kaam ki permission nahi hai (permission required).');
       req.user = user; next();
     } catch (e) { console.error('[auth]', e.message); deny(res, 500, 'Server error'); }
   };

@@ -54,6 +54,14 @@ module.exports = function createDb({ dataDir }) {
       t: { id: 'SERIAL PRIMARY KEY', ts: 'TIMESTAMP', real: 'DOUBLE PRECISION', big: 'BIGINT' },
       async addColumn(table, def) { await pool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${def}`); },
       async init() { await pool.query('SELECT 1'); },
+      // Supabase exposes the public schema through its web API. Turn Row Level Security ON for every
+      // table (no policies = the public API can read nothing); this server connects as the owner
+      // role, which is not affected, so the CRM keeps working.
+      async secure() {
+        const { rows } = await pool.query(`SELECT tablename FROM pg_tables WHERE schemaname='public'`);
+        for (const r of rows) await pool.query(`ALTER TABLE public."${r.tablename.replace(/"/g, '""')}" ENABLE ROW LEVEL SECURITY`);
+        return rows.length;
+      },
       close: () => pool.end(),
     };
   }
@@ -77,6 +85,7 @@ module.exports = function createDb({ dataDir }) {
       catch (e) { if (!/duplicate column/i.test(e.message)) throw e; }
     },
     async init() { await run('PRAGMA journal_mode=WAL'); },
+    async secure() { return 0; },
     close: () => new Promise(r => db.close(r)),
   };
 };
