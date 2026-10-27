@@ -879,6 +879,59 @@ body {
   .content { padding: 14px; }
   .cv-content { padding: 14px; }
   .toolbar { gap: 7px; }
+
+  /* Mobile top bar: title/subtitle + date box + bell + avatar no longer
+     fit on one 72px row — this was overlapping "Dashboard" with the date
+     box. Let the bar grow in height and drop the date box on small screens
+     instead of letting it collide with the heading. */
+  .topbar {
+    height: auto;
+    min-height: 64px;
+    padding: 10px 14px;
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .tb-left h1 { font-size: 19px; }
+  .tb-left p  { font-size: 12px; }
+  .tb-date    { display: none; }
+}
+
+/* Orders list ("Clients & Orders"): this is a fixed-width grid
+   (min-width: 1480px) built for a desktop spreadsheet-style table that
+   scrolls sideways. On a phone that produced a squeezed, overlapping mess
+   instead of a clean horizontal scroll. Below 640px we switch each row
+   from a rigid grid into a simple stacked card: name on its own line,
+   tracking/amount/status below it, nothing pinned to a fixed column width. */
+@media (max-width: 640px) {
+  .tbl-scroll-wrap,
+  .tbl-head, .tbl-row,
+  #list-header-row, #list-body,
+  #dash-list-header-row, #dash-list-body {
+    min-width: 0;
+    overflow-x: hidden;
+  }
+  .tbl-head { display: none; } /* column headings don't apply to a stacked card */
+  .tbl-row.tbl-admin, .tbl-row.tbl-staff {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    min-height: 0;
+    padding: 14px 16px;
+  }
+  .tbl-row .tc-num { display: none; }
+  .tbl-row .tc-name {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    font-size: 17px;
+    padding-right: 0;
+  }
+  .tbl-row .tc-amount { font-size: 17px; }
+  .tbl-row .tc-status-cell,
+  .tbl-row .tc-actions {
+    justify-content: flex-start;
+  }
 }
 
 /* ══════════════════════════════════════════
@@ -2799,8 +2852,18 @@ function loadOrdersFromLocalBackup() {
 
 async function loadAllFromServer() {
   try {
+    // Orders, Users and Settings used to be fetched one after another
+    // (await, await, await), so each network round-trip waited for the
+    // previous one to finish. On higher-latency mobile connections those
+    // three round-trips stacked up into many extra seconds of load time.
+    // Firing them together and waiting on all three at once keeps the
+    // total wait close to whichever single call is slowest.
+    const [od, ud, sd] = await Promise.all([
+      apiFetch('/api/orders'),
+      apiFetch('/api/users'),
+      apiFetch('/api/settings'),
+    ]);
     // Orders
-    const od = await apiFetch('/api/orders');
     if (od.success) {
       data = od.orders;
       idC  = data.length ? Math.max(...data.map(r => r.id)) + 1 : 1;
@@ -2829,13 +2892,11 @@ async function loadAllFromServer() {
       saveOrdersToLocalBackup(); // keep backup fresh with server data
     }
     // Users
-    const ud = await apiFetch('/api/users');
     if (ud.success) {
       users   = ud.users;
       userIdC = users.length ? Math.max(...users.map(u => u.id)) + 1 : 2;
     }
     // Settings
-    const sd = await apiFetch('/api/settings');
     if (sd.success) {
       if (sd.settings.macrm_logo) {
         // Apply to all placements AND update localStorage cache
