@@ -89,7 +89,10 @@ module.exports = function createAuth({ dbRun, dbGet }) {
 
   // 2) every /api route needs a valid session (+ CSRF origin check, + owner-only list)
   const gate = async (req, res, next) => {
-    const path = req.path;
+    // Express matches routes case-insensitively (/API/Staff/add reaches the /api/staff/add route),
+    // so every check below uses the lower-cased path. Without this, "/API/..." skipped the login
+    // check entirely and "/api/Staff/add" slipped past the owner-only list.
+    const path = req.path.toLowerCase();
     if (!path.startsWith('/api/')) return next();
     // WhatsApp extension bridge: it has no login, so it is accepted from THIS PC only
     if (path.startsWith('/api/wa-bridge/')) {

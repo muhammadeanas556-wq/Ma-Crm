@@ -237,6 +237,19 @@ async function initDB() {
     `created_by_name TEXT`,          // name at creation time (kept if the staff account is later deleted)
     `updated_at ${T.ts}`,
   ]) await addColumn('orders', col);
+  // ── MANUAL DISPATCH MESSAGE (Method 1: WhatsApp click-to-chat) ──
+  // Separate from the automatic wa_* columns so the two never overwrite each other.
+  // NULL = not opened yet ("Ready to Send" when the data is complete) → 'opened' → 'sent'.
+  // 'sent' is ONLY written when a person confirms it; opening a chat proves nothing.
+  // Never touches the order status or courier status.
+  for (const col of [
+    `dispatch_status TEXT`,            // NULL | opened | sent
+    `dispatch_phone TEXT`,             // number the chat was opened for (digits, with country code)
+    `dispatch_opened_at ${T.ts}`,
+    `dispatch_sent_at ${T.ts}`,
+    `dispatch_by_user_id INTEGER`,     // who last opened / confirmed
+    `dispatch_by_name TEXT`,
+  ]) await addColumn('orders', col);
   await dbRun(`CREATE INDEX IF NOT EXISTS idx_orders_created_by ON orders(created_by_user_id)`)
     .catch(e => console.warn('⚠ idx_orders_created_by:', e.message));
 
@@ -329,7 +342,14 @@ const requireOrderAccess = async (req, res, next) => {
     req.order = r.order; next();
   } catch (e) { console.error('[order access]', e.message); res.status(500).json({ success: false, message: 'Server error' }); }
 };
+// Staff-account management (add / edit / disable / delete) is Admin-only. auth.js already blocks
+// /api/staff/* for staff at the gate; this second check sits on the routes themselves, so a
+// staff account can never create or change accounts even if the gate list is edited later.
+const STAFF_ADMIN_ONLY = { success: false, code: 'forbidden', message: 'Only the Admin can add or manage staff accounts.' };
+const requireAdmin = (req, res, next) => (isAdmin(req.user) ? next() : res.status(403).json(STAFF_ADMIN_ONLY));
 // Ownership stamped on a NEW order — always from the session, never from the request body.
+// Same order code the CRM shows everywhere (MA-MMYY-id; month is stored 0-based).
+const makeOrderCode = o => `MA-${String(Number(o.month) + 1).padStart(2, '0')}${String(o.year).slice(-2)}-${o.id}`;
 const ownerOf = user => ({ id: user.id, role: isAdmin(user) ? 'admin' : 'staff', name: user.name || '' });
 
 // ── PROFILE PICTURES — one per user account, stored on the user row ──
@@ -452,7 +472,7 @@ app.post('/api/users/update', async (req, res) => {
 });
 
 // ── STAFF: ADD ──────────────────────────────────────────────
-app.post('/api/staff/add', async (req, res) => {
+app.post('/api/staff/add', requireAdmin, async (req, res) => {
   try {
     const { name, email, password, photo } = req.body || {};
     if (!name || !email || !password) return res.json({ success: false, message: 'Name, email, password required hai' });
@@ -475,7 +495,7 @@ app.post('/api/staff/add', async (req, res) => {
 });
 
 // ── STAFF: UPDATE ───────────────────────────────────────────
-app.post('/api/staff/update', async (req, res) => {
+app.post('/api/staff/update', requireAdmin, async (req, res) => {
   try {
     const { id, name, email, password, photo, active } = req.body || {};
     if (!id) return res.json({ success: false, message: 'id required hai' });
@@ -508,7 +528,7 @@ app.post('/api/staff/update', async (req, res) => {
 });
 
 // ── STAFF: DELETE ───────────────────────────────────────────
-app.delete('/api/staff/:id', async (req, res) => {
+app.delete('/api/staff/:id', requireAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     // Their orders stay (Admin still sees them under Staff Orders, with the saved creator name).
@@ -1129,9 +1149,14 @@ app.get('/api/orders/:id/screenshots', requireOrderAccess, async (req, res) => {
 
 app.get('/api/orders/:id/screenshots/:sid/file', requireOrderAccess, async (req, res) => {
   try {
-    const row = await dbGet(`SELECT file_name, mime FROM order_screenshots WHERE id=? AND order_id=?`, [parseInt(req.params.sid), req.order.id]);
+    const row = await dbGet(`SELECT file_name, mime, position FROM order_screenshots WHERE id=? AND order_id=?`, [parseInt(req.params.sid), req.order.id]);
     if (!row) return res.status(404).json({ success: false, message: 'Screenshot nahi mila' });
     if (!(await storage.ensureLocal(SS_ROOT, row.file_name))) return res.status(404).json({ success: false, message: 'Screenshot file nahi mili' });
+    // ?download=1 → "Download original" in the dispatch panel saves the exact original file.
+    if (req.query.download === '1') {
+      const ext = path.extname(row.file_name) || '';
+      res.attachment(`${makeOrderCode(req.order)}-image-${Number(row.position) + 1}${ext}`);
+    }
     res.type(row.mime).sendFile(path.join(SS_ROOT, row.file_name));
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
@@ -1431,6 +1456,103 @@ app.post('/api/orders/:id/whatsapp/mark-sent', requireOrderAccess, async (req, r
     const ok = await waFlow.markSent(req.order.id);
     res.json(ok ? { success: true } : { success: false, message: 'Sirf failed WhatsApp ko "sent" mark kar saktay hain' });
   } catch (e) { res.json({ success: false, message: e.message }); }
+});
+
+// ════════════════════════════════════════════════════════════
+//  📤 SEND DISPATCH MESSAGE — Method 1 (WhatsApp click-to-chat)
+//  The server prepares the chat number + message from the SAVED order; the browser opens
+//  WhatsApp and the person attaches the original image and presses Send. Every route is
+//  ownership-checked (requireOrderAccess): Admin → any order, Staff → only their own.
+//  Nothing here sends a message, creates an order, or changes the order / courier status.
+// ════════════════════════════════════════════════════════════
+const DISPATCH_PROBLEMS = {
+  no_phone:    'Is order mein customer ka phone number nahi hai.',
+  bad_phone:   'Customer ka number WhatsApp ke liye sahi nahi',
+  no_tracking: 'Tracking ID abhi save nahi hui — dispatch message tracking ID ke baghair nahi banta.',
+  template:    'Dispatch message nahi ban saka',
+};
+// The number the chat opens for. The number picked at Place Order (wa_phone) is used only while
+// it is still one of the order's current numbers — after the phone is edited, the edited one wins.
+function dispatchNumber(o) {
+  const phones = phoneUtil.split(o.phone || '');
+  if (!phones.length) return { ok: false, code: 'no_phone', reason: DISPATCH_PROBLEMS.no_phone };
+  let ph = null;
+  if (o.wa_phone && phones.some(p => phoneUtil.sameNumber(p, o.wa_phone))) ph = phoneUtil.normalize(o.wa_phone);
+  if (!ph || !ph.ok) ph = phoneUtil.pickWhatsApp(phones);
+  if (!ph || !ph.ok || !/^\d{8,15}$/.test(String(ph.number || ''))) {
+    return { ok: false, code: 'bad_phone', reason: `${DISPATCH_PROBLEMS.bad_phone}${ph && ph.reason ? ' — ' + ph.reason : ''}` };
+  }
+  return { ok: true, number: String(ph.number), display: ph.display || '+' + ph.number };
+}
+function dispatchState(o) {
+  return {
+    status: o.dispatch_status || null, phone: o.dispatch_phone || null,
+    opened_at: o.dispatch_opened_at || null, sent_at: o.dispatch_sent_at || null, by_name: o.dispatch_by_name || null,
+  };
+}
+
+app.get('/api/orders/:id(\\d+)/dispatch', requireOrderAccess, async (req, res) => {
+  try {
+    const o = req.order;
+    const problems = [];
+    const num = dispatchNumber(o);
+    if (!num.ok) problems.push({ code: num.code, message: num.reason });
+    let message = '', orderCode = makeOrderCode(o);
+    if (!String(o.tracking_id || '').trim()) problems.push({ code: 'no_tracking', message: DISPATCH_PROBLEMS.no_tracking });
+    else {
+      try { const m = waFlow.dispatchMessage(o, { business: BUSINESS_NAME }); message = m.text; orderCode = m.order_code; }
+      catch (e) { problems.push({ code: 'template', message: `${DISPATCH_PROBLEMS.template}: ${e.message}` }); }
+    }
+    const shots = await dbAll(`SELECT id, position, original_name, mime, bytes FROM order_screenshots WHERE order_id=? ORDER BY position ASC`, [o.id]);
+    res.json({
+      success: true,
+      dispatch: {
+        order_id: o.id, order_code: orderCode, customer: o.name, tracking_id: o.tracking_id || '',
+        ready: problems.length === 0, problems,
+        phone: num.ok ? { number: num.number, display: num.display } : null,
+        message,
+        screenshots: shots.map(s => ({
+          id: s.id, position: s.position, name: s.original_name || `Screenshot ${s.position + 1}`, mime: s.mime, bytes: s.bytes,
+          url: `/api/orders/${o.id}/screenshots/${s.id}/file`,
+        })),
+        state: dispatchState(o),
+        // The automatic sender's result for this order, so nobody sends the same message twice by accident.
+        auto: { status: o.wa_status || null, sent_at: o.wa_sent_at || null },
+      },
+    });
+  } catch (e) { console.error('[dispatch]', e.message); res.status(500).json({ success: false, message: 'Dispatch details load nahi huin' }); }
+});
+
+// The browser opened the WhatsApp chat. This is NOT "sent" — WhatsApp gives no confirmation.
+app.post('/api/orders/:id(\\d+)/dispatch/opened', requireOrderAccess, async (req, res) => {
+  try {
+    const o = req.order;
+    const num = dispatchNumber(o);
+    if (!num.ok) return res.status(400).json({ success: false, code: num.code, message: num.reason });
+    // Already confirmed as sent → keep 'sent'; only the "opened" time is refreshed.
+    await dbRun(`UPDATE orders SET dispatch_status = CASE WHEN dispatch_status = 'sent' THEN 'sent' ELSE 'opened' END,
+                   dispatch_phone=?, dispatch_opened_at=CURRENT_TIMESTAMP, dispatch_by_user_id=?, dispatch_by_name=? WHERE id=?`,
+      [num.number, req.user.id, String(req.user.name || '').slice(0, 120), o.id]);
+    const row = await dbGet(`SELECT * FROM orders WHERE id=?`, [o.id]);
+    res.json({ success: true, state: dispatchState(row) });
+  } catch (e) { console.error('[dispatch/opened]', e.message); res.status(500).json({ success: false, message: 'Status save nahi hua' }); }
+});
+
+// The person confirms they pressed Send in WhatsApp ({sent:true}), or undoes that ({sent:false}).
+app.post('/api/orders/:id(\\d+)/dispatch/confirm', requireOrderAccess, async (req, res) => {
+  try {
+    const o = req.order;
+    const sent = !(req.body && req.body.sent === false);
+    if (sent) {
+      await dbRun(`UPDATE orders SET dispatch_status='sent', dispatch_sent_at=CURRENT_TIMESTAMP, dispatch_by_user_id=?, dispatch_by_name=? WHERE id=?`,
+        [req.user.id, String(req.user.name || '').slice(0, 120), o.id]);
+    } else {
+      await dbRun(`UPDATE orders SET dispatch_status = CASE WHEN dispatch_opened_at IS NULL THEN NULL ELSE 'opened' END, dispatch_sent_at=NULL
+                   WHERE id=? AND dispatch_status='sent'`, [o.id]);
+    }
+    const row = await dbGet(`SELECT * FROM orders WHERE id=?`, [o.id]);
+    res.json({ success: true, state: dispatchState(row) });
+  } catch (e) { console.error('[dispatch/confirm]', e.message); res.status(500).json({ success: false, message: 'Status save nahi hua' }); }
 });
 
 app.get('/api/whatsapp/session', (req, res) => res.json({ success: true, session: waSender.status() }));

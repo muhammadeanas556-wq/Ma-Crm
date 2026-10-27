@@ -1401,6 +1401,40 @@ body {
 .tc-wa-sent { color:var(--green); background:var(--green-dim); border-color:rgba(34,197,94,.3); }
 .tc-wa-failed { color:var(--red); background:var(--red-dim); border-color:rgba(239,68,68,.35); }
 .tc-wa-busy { color:var(--accent2); background:var(--accent-dim); border-color:rgba(59,130,246,.3); }
+/* Send Dispatch Message (Method 1) — row chip + panel */
+.tc-disp-line { margin-top:5px; line-height:1; }
+.tc-disp-line .tc-wa { margin-left:0; font-size:10px; padding:2px 7px; }
+.tc-disp { color:var(--accent2); background:var(--accent-dim); border-color:rgba(59,130,246,.3); }
+.tc-disp:hover { color:var(--text); border-color:rgba(255,255,255,.18); }
+.tc-disp-opened { color:var(--yellow); background:var(--yellow-dim); border-color:rgba(245,158,11,.3); }
+.tc-disp-sent { color:var(--green); background:var(--green-dim); border-color:rgba(34,197,94,.3); }
+.disp-modal { max-width:560px; width:95%; max-height:92vh; overflow-y:auto; }
+.disp-sub { font-size:12px; color:var(--muted); font-family:var(--mono); margin:-14px 0 14px; }
+.disp-state { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+.disp-pill { font-size:11px; font-weight:700; border-radius:999px; padding:3px 10px; border:1px solid var(--border); color:var(--muted); }
+.disp-pill.on { color:var(--white); border-color:var(--accent2); background:var(--accent-dim); }
+.disp-pill.ok { color:var(--green); border-color:rgba(34,197,94,.35); background:var(--green-dim); }
+.disp-note { font-size:12px; line-height:1.6; border-radius:var(--r-md); padding:9px 12px; margin-bottom:12px; border:1px solid rgba(245,158,11,.3); background:var(--yellow-dim); color:var(--text); }
+.disp-section { border:1px solid var(--border); border-radius:var(--r-lg); padding:12px 14px; margin-bottom:12px; background:var(--bg2); }
+.disp-section h4 { font-size:12px; font-weight:800; color:var(--white); margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+.disp-step { display:inline-flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; background:var(--bg4); color:var(--white); font-size:11px; font-weight:800; flex-shrink:0; }
+.disp-to { font-size:14px; color:var(--text); }
+.disp-to b { color:var(--white); font-family:var(--mono); }
+.disp-msg { width:100%; min-height:150px; resize:vertical; background:var(--bg3); border:1px solid var(--border); color:var(--text); padding:10px 12px; font-size:13px; line-height:1.55; font-family:var(--font); border-radius:var(--r-md); outline:none; }
+.disp-imgs { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
+.disp-img { border:1px solid var(--border); border-radius:var(--r-md); overflow:hidden; background:var(--bg3); display:flex; flex-direction:column; }
+.disp-img img { width:100%; height:120px; object-fit:cover; display:block; cursor:zoom-in; background:#0003; }
+.disp-img-acts { display:flex; flex-direction:column; gap:4px; padding:6px; }
+.disp-img-acts .btn-sm { width:100%; text-align:center; text-decoration:none; background:var(--bg4); color:var(--text); }
+.disp-img-acts .btn-sm.btn-sm-green { background:var(--green-dim); color:var(--green); }
+.disp-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.disp-actions a.btn { text-decoration:none; }
+.disp-actions .btn[aria-disabled="true"] { opacity:.45; pointer-events:none; }
+.disp-hint { font-size:11px; color:var(--muted); line-height:1.6; margin-top:8px; }
+.disp-hint code { font-family:var(--mono); background:var(--bg3); padding:0 5px; border-radius:4px; color:var(--white); }
+.disp-problems { list-style:none; margin:0 0 12px; padding:0; display:flex; flex-direction:column; gap:6px; }
+.disp-problems li { font-size:12px; line-height:1.55; border-radius:var(--r-md); padding:8px 12px; border:1px solid rgba(239,68,68,.3); background:var(--red-dim); color:#fca5a5; }
+@media (max-width:560px) { .disp-actions .btn { flex:1 1 100%; justify-content:center; } }
 
 @media (max-width:640px) {
   .wa-split { grid-template-columns:1fr; }
@@ -2269,8 +2303,8 @@ body:not(.is-staff) .staff-only { display: none !important; }
           </div>
         </div>
 
-        <!-- Section B: Staff Management -->
-        <div class="card">
+        <!-- Section B: Staff Management (Admin only — the server also rejects staff requests to /api/staff/*) -->
+        <div class="card admin-only" id="staff-management-card">
           <div class="card-head">
             <div class="card-head-left">
               <h3>Staff Management</h3>
@@ -2367,7 +2401,7 @@ body:not(.is-staff) .staff-only { display: none !important; }
 </div><!-- #adminApp -->
 
 <!-- ADD STAFF MODAL -->
-<div class="overlay" id="addStaffModal">
+<div class="overlay admin-only" id="addStaffModal">
   <div class="modal modal-lg">
     <h3>➕ Add Staff Member</h3>
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
@@ -2392,7 +2426,7 @@ body:not(.is-staff) .staff-only { display: none !important; }
 </div>
 
 <!-- EDIT STAFF MODAL -->
-<div class="overlay" id="editStaffModal">
+<div class="overlay admin-only" id="editStaffModal">
   <div class="modal modal-lg">
     <h3>✏️ Edit Staff Member</h3>
     <input type="hidden" id="edit-staff-id"/>
@@ -2427,7 +2461,7 @@ body:not(.is-staff) .staff-only { display: none !important; }
 </div>
 
 <!-- DELETE STAFF MODAL -->
-<div class="overlay" id="deleteStaffModal">
+<div class="overlay admin-only" id="deleteStaffModal">
   <div class="modal">
     <h3>Confirm Delete</h3>
     <p id="del-staff-msg"></p>
@@ -2547,6 +2581,7 @@ body:not(.is-staff) .staff-only { display: none !important; }
     </div>
     <div class="form-actions">
       <button class="btn btn-blue" onclick="saveEditOrder()">Save Changes</button>
+      <button class="btn btn-outline" type="button" onclick="if(pendingEditId)openDispatch(pendingEditId)" title="Saved order se WhatsApp dispatch message — pehle changes save karein">📤 Send Dispatch Message</button>
     </div>
 
     <!-- ── SCREENSHOT UPLOAD ── -->
@@ -2666,6 +2701,14 @@ body:not(.is-staff) .staff-only { display: none !important; }
     <div class="form-actions" style="margin-top:16px">
       <button class="btn btn-outline" onclick="closeOrderSsViewerModal()">Close</button>
     </div>
+  </div>
+</div>
+
+<!-- SEND DISPATCH MESSAGE (Method 1: WhatsApp click-to-chat) — rendered by dispRender() -->
+<div class="overlay" id="dispatchModal" onclick="if(event.target===this)closeDispatch()">
+  <div class="modal disp-modal" role="dialog" aria-modal="true" aria-labelledby="dispTitle">
+    <h3 id="dispTitle">📤 Send Dispatch Message</h3>
+    <div id="dispBody" aria-live="polite"></div>
   </div>
 </div>
 
@@ -3557,7 +3600,14 @@ function saveDemoAccount() {
 }
 
 // ─── ADD STAFF ─────────────────────────────────────────────
+// Staff-account management is Admin-only (the server enforces this too — these only stop the UI)
+function staffMgmtAllowed() {
+  if (role === 'admin') return true;
+  toast('Sirf Admin staff add ya manage kar sakta hai', false);
+  return false;
+}
 function openAddStaffModal() {
+  if (!staffMgmtAllowed()) return;
   newStaffPhoto = null;
   document.getElementById('staff-name').value = '';
   document.getElementById('staff-email').value = '';
@@ -3584,6 +3634,7 @@ function handleStaffPicUpload(input) {
 }
 
 function saveNewStaff() {
+  if (!staffMgmtAllowed()) return;
   const name  = document.getElementById('staff-name').value.trim();
   const email = document.getElementById('staff-email').value.trim();
   const pass  = document.getElementById('staff-pass').value.trim();
@@ -3609,6 +3660,7 @@ function saveNewStaff() {
 
 // ─── EDIT STAFF ────────────────────────────────────────────
 function openEditStaffModal(id) {
+  if (!staffMgmtAllowed()) return;
   const u = users.find(x => x.id === id);
   if (!u) return;
   editStaffPhoto = null;
@@ -3647,6 +3699,7 @@ function handleEditStaffPicUpload(input) {
 }
 
 function saveEditStaff() {
+  if (!staffMgmtAllowed()) return;
   const id    = parseInt(document.getElementById('edit-staff-id').value);
   const name  = document.getElementById('edit-staff-name').value.trim();
   const email = document.getElementById('edit-staff-email').value.trim();
@@ -3674,12 +3727,14 @@ function saveEditStaff() {
 
 // ─── DELETE STAFF ──────────────────────────────────────────
 function openDeleteStaffModal(id, name) {
+  if (!staffMgmtAllowed()) return;
   pendingDelStaffId = id;
   document.getElementById('del-staff-msg').textContent = `"${name}" ko delete karein? Ye wapas nahi ho sakta.`;
   document.getElementById('deleteStaffModal').classList.add('open');
 }
 function closeDeleteStaffModal() { document.getElementById('deleteStaffModal').classList.remove('open'); pendingDelStaffId = null; }
 function confirmDeleteStaff() {
+  if (!staffMgmtAllowed()) return;
   apiFetch(`/api/staff/${pendingDelStaffId}`, { method: 'DELETE' }).then(res => {
     if (!res.success) { toast(res.message || 'Delete fail hua', false); return; }
     users = users.filter(u => u.id !== pendingDelStaffId);
@@ -4539,10 +4594,11 @@ function renderRows(rows, bodyId, emptyId, countId) {
       if (['pending', 'processing', 'opening'].includes(r.wa_status) && !waPolls.has(r.id)) { waPolls.set(r.id, 'busy'); setTimeout(() => waPoll(r.id), 0); }
       const waLbl = { sent: ['sent', 'WA ✓', 'WhatsApp sent'], failed: ['failed', 'WA ✕', 'WhatsApp failed — click to Retry'] }[r.wa_status] || ['busy', 'WA …', 'WhatsApp sending'];
       const waBadge = r.wa_status ? `<button type="button" class="tc-wa tc-wa-${waLbl[0]}" onclick="waShowProgress(${r.id})" title="${waLbl[2]}">${waLbl[1]}</button>` : '';
+      const dispBadge = dispatchChip(r);
       const ssBtn = `<button class="tc-ss-btn${hasSs?' has-ss':''}" onclick="openOrderSsViewer(${r.id},'${esc(makeOrderId(r))}')" title="${hasSs?'Screenshots dekhen':'Koi screenshot nahi'}">📸</button>`;
       return `<div class="tbl-row tbl-admin">
         <span class="tc-num">${String(rows.length - i).padStart(2,'0')}</span>
-        <div class="tc-track">${trackCell(r)}${placedLine(r)}</div>
+        <div class="tc-track">${trackCell(r)}${placedLine(r)}<div class="tc-disp-line">${dispBadge}</div></div>
         <div class="tc-name" title="${esc(r.name)}">${esc(r.name)} ${ssBtn}${r.source === 'ai_screenshot' ? '<span class="tc-ai-tag" title="Created with AI Screenshot Import">AI</span>' : ''}${isAdm && r.created_by_role === 'staff' ? `<span class="tc-owner-tag" title="Created by Staff: ${esc(orderOwnerName(r))}">👤 ${esc(orderOwnerName(r))}</span>` : ''}</div>
         <div class="tc-phone hide-sm">${esc(r.phone)}</div>
         <div class="tc-detail hide-md" title="${esc(r.detail||'')}">${r.detail ? esc(r.detail) : '<span style="color:var(--dim)">—</span>'}</div>
@@ -6541,6 +6597,8 @@ function waRenderProgress(st) {
     if (['no_extension', 'no_tab', 'not_linked', 'not_ready', 'timeout', 'not_installed'].includes(st.error_code)) buttons += `<button type="button" class="btn btn-outline" onclick="waOpenConnect()">Connect WhatsApp</button>`;
     if (WA_ASK_FIRST.includes(st.error_code)) buttons += `<button type="button" class="btn btn-outline" onclick="waMarkSent(${id}, this)">Already sent</button>`;
   }
+  // Method 1 — available as soon as the order is saved, whatever the automatic sender is doing.
+  buttons += `<button type="button" class="btn btn-blue" onclick="openDispatch(${id})" title="WhatsApp chat khol kar dispatch message tayyar karein">📤 Send Dispatch Message</button>`;
   buttons += `<button type="button" class="btn btn-outline wa-close" onclick="aiRequestClose()">Close</button>`;
 
   aiById('aiStepProgress').innerHTML = `
@@ -6628,6 +6686,211 @@ async function waUnlink() {
   if (!confirm('Is computer se WhatsApp unlink karein? Dobara QR scan karna hoga.')) return;
   try { await apiFetch('/api/whatsapp/session/logout', { method: 'POST', body: '{}' }); } catch (e) { console.warn('[CRM]', e); }
   waConnectTick(false);
+}
+
+// ════════════════════════════════════════════════════════════
+//  📤 SEND DISPATCH MESSAGE — Method 1 (WhatsApp click-to-chat)
+//  Everything comes from the SAVED order via GET /api/orders/:id/dispatch (ownership-checked
+//  on the server). The browser opens the customer's chat with the message pre-filled; the
+//  person attaches the original image and presses Send in WhatsApp. A WhatsApp link cannot
+//  attach a file, and opening a chat does not prove a message was sent — so "Sent" is only
+//  recorded when the person confirms it.
+// ════════════════════════════════════════════════════════════
+let dispView = { orderId: null, info: null, seq: 0 };
+const DISP_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
+const DISP_WINDOW = 'macrm_whatsapp';   // one reusable WhatsApp tab instead of a new tab per order
+
+function dispatchChip(r) {
+  const st = r.dispatch_status;
+  const [cls, lbl, tip] = st === 'sent' ? ['tc-disp-sent', 'Dispatch ✓', 'Dispatch message sent (confirmed)']
+    : st === 'opened' ? ['tc-disp-opened', 'Dispatch …', 'WhatsApp opened — message sent hone ke baad confirm karein']
+    : ['tc-disp', '📤 Dispatch', 'Send Dispatch Message'];
+  return `<button type="button" class="tc-wa ${cls}" onclick="openDispatch(${Number(r.id)})" title="${tip}" aria-label="Send Dispatch Message">${lbl}</button>`;
+}
+const dispTime = ts => { if (!ts) return ''; const d = new Date(String(ts).replace(' ', 'T') + (/[zZ+]/.test(String(ts).slice(10)) ? '' : 'Z')); return isNaN(d) ? '' : d.toLocaleString('en-PK', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); };
+
+async function openDispatch(orderId) {
+  if (role !== 'admin' && role !== 'staff') { toast('Access denied', false); return; }
+  const id = Number(orderId);
+  if (!Number.isInteger(id) || id <= 0) { toast('Order abhi save nahi hua — pehle Place Order karein', false); return; }
+  const seq = ++dispView.seq;
+  dispView = { orderId: id, info: null, seq };
+  document.getElementById('dispatchModal').classList.add('open');
+  document.getElementById('dispBody').innerHTML = '<div class="ai-loading" style="padding:24px 0"><div class="ai-spinner" aria-hidden="true"></div><div class="ai-loading-sub">Saved order se dispatch message tayyar ho raha hai…</div></div>';
+  let res = null;
+  try { res = await apiFetch(`/api/orders/${id}/dispatch`); } catch (e) { console.warn('[dispatch]', e); }
+  if (seq !== dispView.seq) return;   // another order was opened meanwhile
+  if (!res || !res.success) {
+    const msg = !res ? 'Server se connect nahi hua — internet check karein aur dobara try karein.'
+      : res.code === 'forbidden' ? 'Yeh order aap ke account ka nahi — is ka dispatch message aap nahi bhej saktay.'
+      : res.code === 'not_found' ? 'Order nahi mila (shayad delete ho chuka hai).'
+      : (res.message || 'Dispatch details load nahi huin.');
+    document.getElementById('dispBody').innerHTML = `<ul class="disp-problems"><li>${esc(msg)}</li></ul>
+      <div class="disp-actions">${res && res.code === 'forbidden' ? '' : `<button type="button" class="btn btn-blue" onclick="openDispatch(${id})">Try again</button>`}
+      <button type="button" class="btn btn-outline" onclick="closeDispatch()">Close</button></div>`;
+    return;
+  }
+  dispView.info = res.dispatch;
+  dispRender();
+}
+function closeDispatch() { document.getElementById('dispatchModal').classList.remove('open'); dispView.seq++; }
+
+function dispChatUrl(number, text) {
+  const t = encodeURIComponent(text || '');
+  return DISP_MOBILE ? `https://wa.me/${number}?text=${t}` : `https://web.whatsapp.com/send?phone=${number}&text=${t}`;
+}
+
+function dispRender() {
+  const d = dispView.info; if (!d) return;
+  const st = d.state || {};
+  const ready = d.ready && d.phone;
+  const pill = (on, cls, txt) => `<span class="disp-pill ${on ? cls : ''}">${txt}</span>`;
+  const pills = `<div class="disp-state" aria-label="Dispatch status">
+    ${pill(ready && !st.status, 'on', ready ? 'Ready to Send' : 'Not ready')}
+    ${pill(st.status === 'opened', 'on', 'WhatsApp Opened' + (st.status === 'opened' && st.opened_at ? ' · ' + esc(dispTime(st.opened_at)) : ''))}
+    ${pill(st.status === 'sent', 'ok', 'Sent' + (st.status === 'sent' ? ' ✓ ' + esc([st.by_name, dispTime(st.sent_at)].filter(Boolean).join(' · ')) : ''))}
+  </div>`;
+  let notes = '';
+  if (d.auto && d.auto.status === 'sent') notes += `<div class="disp-note">Automatic WhatsApp is order ke liye pehle hi bhej chuka hai${d.auto.sent_at ? ' (' + esc(dispTime(d.auto.sent_at)) + ')' : ''}. Dobara bhejne se pehle customer ki chat check karein.</div>`;
+  if (st.status === 'sent') notes += `<div class="disp-note">Yeh dispatch message pehle hi “Sent” mark ho chuka hai. Dobara sirf zaroorat ho to bhejein.</div>`;
+  const inData = data.some(r => r.id === d.order_id);
+  const problems = d.problems && d.problems.length ? `<ul class="disp-problems">${d.problems.map(p => `<li>${esc(p.message)}</li>`).join('')}</ul>
+    ${inData ? `<div class="disp-actions" style="margin-bottom:12px"><button type="button" class="btn btn-blue" onclick="closeDispatch();openEditOrderModal(${d.order_id})">✎ Edit Order (number / tracking ID theek karein)</button></div>` : ''}` : '';
+
+  const to = d.phone ? `<div class="disp-to">To: <b>${esc(d.phone.display)}</b> · ${esc(d.customer)}</div>` : '';
+  const msgBox = d.message ? `<div class="disp-section"><h4><span class="disp-step">1</span>Message <span style="font-weight:400;color:var(--muted)">(saved order se — zaroorat ho to edit karein)</span></h4>
+      <textarea class="disp-msg" id="dispMsg" aria-label="Dispatch message" oninput="dispView.info.messageEdited=this.value">${esc(d.messageEdited != null ? d.messageEdited : d.message)}</textarea>
+      <div class="disp-actions" style="margin-top:8px"><button type="button" class="btn-sm" style="background:var(--bg4);color:var(--text)" onclick="dispCopyText()">⧉ Copy message</button></div></div>` : '';
+
+  const shots = d.screenshots || [];
+  const imgs = shots.length ? `<div class="disp-imgs">${shots.map((s, i) => `
+      <div class="disp-img">
+        <img src="${esc(s.url)}" alt="${esc(s.name)}" onclick="openSsLightbox(this.src)" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'disp-hint',style:'padding:10px',textContent:'Image load nahi hui — Open original try karein'}))"/>
+        <div class="disp-img-acts">
+          <button type="button" class="btn-sm btn-sm-green" onclick="dispCopyImage(${i}, this)">⧉ Copy image</button>
+          <a class="btn-sm" href="${esc(s.url)}?download=1" download>⬇ Download original</a>
+          <a class="btn-sm" href="${esc(s.url)}" target="_blank" rel="noopener">↗ Open Original Image</a>
+        </div>
+      </div>`).join('')}</div>
+      <div class="disp-hint">“Copy image” ke baad WhatsApp chat mein <code>Ctrl+V</code> dabayein — image attach ho jayegi. Copy na ho to “Download original” karein aur 📎 se attach karein.</div>`
+    : `<div class="disp-hint" style="margin-top:0">Is order ke saath koi original image server par save nahi. Message phir bhi bhej saktay hain; image ho to WhatsApp mein 📎 se khud attach karein.</div>`;
+  const imgBox = `<div class="disp-section"><h4><span class="disp-step">2</span>Original order / tracking image</h4>${imgs}</div>`;
+
+  const sentNow = st.status === 'sent';
+  const actions = `<div class="disp-section"><h4><span class="disp-step">3</span>WhatsApp mein bhejein</h4>
+    <div class="disp-actions">
+      <button type="button" class="btn btn-green" id="dispOpenBtn" onclick="dispOpenChat()" ${ready ? '' : 'disabled aria-disabled="true"'}>💬 Open WhatsApp Chat</button>
+      ${sentNow ? `<button type="button" class="btn btn-outline" onclick="dispConfirm(false, this)">Undo “Sent”</button>`
+                : `<button type="button" class="btn btn-blue" onclick="dispConfirm(true, this)" ${d.phone ? '' : 'disabled'}>✓ Mark as Sent</button>`}
+      <button type="button" class="btn btn-outline" onclick="closeDispatch()" style="margin-left:auto">Close</button>
+    </div>
+    <div id="dispBlocked"></div>
+    <div class="disp-hint">Chat khulne par message pehle se likha hoga. Image paste karein (<code>Ctrl+V</code>), phir WhatsApp mein Send dabayein. Wapas aa kar “Mark as Sent” dabayein — CRM khud nahi jaan sakta ke message chala gaya.<br>
+      WhatsApp Web QR code maange to pehle login karein, phir “Open WhatsApp Chat” dobara dabayein. WhatsApp Web kisi aur tab mein khula ho to “Use here” dabayein.</div>
+  </div>`;
+
+  document.getElementById('dispBody').innerHTML = `<div class="disp-sub">${esc(d.order_code)} · ${esc(d.customer)}${d.tracking_id ? ' · 📦 ' + esc(d.tracking_id) : ''}</div>
+    ${pills}${notes}${problems}${to ? `<div class="disp-section">${to}</div>` : ''}${msgBox}${imgBox}${actions}`;
+}
+
+function dispCurrentText() {
+  const ta = document.getElementById('dispMsg');
+  return ta ? ta.value : (dispView.info && dispView.info.message) || '';
+}
+
+// Must stay synchronous: browsers only allow a new tab directly inside the click.
+function dispOpenChat() {
+  const d = dispView.info;
+  if (!d || !d.ready || !d.phone) { toast('Pehle upar wali ghalti theek karein', false); return; }
+  const text = dispCurrentText().trim();
+  if (!text) { toast('Message khali hai', false); return; }
+  const url = dispChatUrl(d.phone.number, text);
+  let w = null;
+  try { w = window.open(url, DISP_WINDOW); } catch (e) { console.warn('[dispatch] open:', e); }
+  const box = document.getElementById('dispBlocked');
+  if (!w) {
+    if (box) box.innerHTML = `<div class="disp-note" style="margin:10px 0 0">Browser ne naya tab block kar diya. Address bar mein pop-up allow karein, ya yeh link kholein: <a href="${esc(url)}" target="${DISP_WINDOW}" rel="noopener" onclick="dispMarkOpened()" style="color:var(--accent2);font-weight:700">Open chat with ${esc(d.phone.display)}</a></div>`;
+    return;
+  }
+  try { w.opener = null; w.focus(); } catch (e) { /* cross-origin — fine */ }
+  if (box) box.innerHTML = '';
+  dispMarkOpened();
+}
+
+async function dispMarkOpened() {
+  const id = dispView.orderId;
+  let res = null;
+  try { res = await apiFetch(`/api/orders/${id}/dispatch/opened`, { method: 'POST', body: '{}' }); } catch (e) { console.warn('[dispatch] opened:', e); }
+  if (!res || !res.success) { toast('Chat khul gayi, lekin “WhatsApp Opened” status save nahi hua' + (res && res.message ? ' — ' + res.message : ''), false); return; }
+  dispApplyState(id, res.state);
+}
+
+async function dispConfirm(sent, btn) {
+  const id = dispView.orderId;
+  if (sent && !confirm('Kya aap ne WhatsApp mein dispatch message (aur image) Send kar diya hai?\n\nOK = “Sent” mark karein.')) return;
+  if (btn) btn.disabled = true;
+  let res = null;
+  try { res = await apiFetch(`/api/orders/${id}/dispatch/confirm`, { method: 'POST', body: JSON.stringify({ sent: !!sent }) }); } catch (e) { console.warn('[dispatch] confirm:', e); }
+  if (btn) btn.disabled = false;
+  if (!res || !res.success) { toast((res && res.message) || 'Server se connect nahi hua — status save nahi hua', false); return; }
+  dispApplyState(id, res.state);
+  toast(sent ? '✓ Dispatch message “Sent” mark ho gaya' : '“Sent” hata diya');
+}
+
+function dispApplyState(id, state) {
+  if (dispView.info && dispView.orderId === id) {
+    const ta = document.getElementById('dispMsg');
+    if (ta) dispView.info.messageEdited = ta.value;
+    dispView.info.state = state;
+    dispRender();
+  }
+  const row = data.find(r => r.id === id);
+  if (row && state) {
+    Object.assign(row, { dispatch_status: state.status, dispatch_opened_at: state.opened_at, dispatch_sent_at: state.sent_at, dispatch_by_name: state.by_name });
+    saveOrdersToLocalBackup();
+    renderList();
+    if (typeof renderDashList === 'function') renderDashList();
+  }
+}
+
+async function dispCopyText() {
+  const text = dispCurrentText();
+  try { await navigator.clipboard.writeText(text); toast('✓ Message copy ho gaya'); }
+  catch (e) {
+    const ta = document.getElementById('dispMsg');
+    if (ta) { ta.select(); try { document.execCommand('copy'); toast('✓ Message copy ho gaya'); return; } catch (x) {} }
+    toast('Copy nahi hua — message select karke Ctrl+C dabayein', false);
+  }
+}
+
+// Copies the saved image to the clipboard (as PNG — the format browsers can paste) so it can be
+// pasted straight into the WhatsApp chat. "Download original" gives the exact original file.
+async function dispCopyImage(i, btn) {
+  const s = dispView.info && (dispView.info.screenshots || [])[i];
+  if (!s) return;
+  if (!navigator.clipboard || !window.ClipboardItem || !window.isSecureContext) {
+    toast('Yeh browser image copy nahi karta — “Download original” karein aur WhatsApp mein 📎 se attach karein', false); return;
+  }
+  const toPng = async blob => {
+    if (blob.type === 'image/png') return blob;
+    const bmp = await createImageBitmap(blob);
+    const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+    c.getContext('2d').drawImage(bmp, 0, 0);
+    return await new Promise((ok, no) => c.toBlob(b => b ? ok(b) : no(new Error('PNG convert fail')), 'image/png'));
+  };
+  const blobPromise = fetch(s.url, { credentials: 'same-origin' })
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+    .then(toPng);
+  if (btn) { btn.disabled = true; btn.textContent = 'Copying…'; }
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]);
+    toast('✓ Image copy ho gayi — WhatsApp chat mein Ctrl+V dabayein');
+    if (btn) btn.textContent = '✓ Copied';
+  } catch (e) {
+    console.warn('[dispatch] copy image:', e);
+    toast('Image copy nahi hui — “Download original” karein aur 📎 se attach karein', false);
+    if (btn) btn.textContent = '⧉ Copy image';
+  } finally { if (btn) btn.disabled = false; }
 }
 
 // ════════════════════════════════════════════════════════════

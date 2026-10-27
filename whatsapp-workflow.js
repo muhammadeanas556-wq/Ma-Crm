@@ -286,6 +286,26 @@ module.exports = function createWorkflow({ dbRun, dbGet, dbAll, screenshotRoot, 
     }
   }
 
+  // ── MANUAL DISPATCH MESSAGE (Method 1, click-to-chat) ─────
+  // Built from the CURRENT saved order row (a tracking ID added or corrected after Place Order
+  // is used), with the product lines frozen at Place Order when they exist. Always uses your
+  // whatsapp-message.txt wording — never Gemini — so nothing is invented. Read-only.
+  function dispatchMessage(o, { business = '' } = {}) {
+    const snap = parse(o.wa_snapshot) || {};
+    const tracking = String(o.tracking_id || '').trim();
+    const data = {
+      name: o.name, phone: o.phone, address: o.address || snap.address || '',
+      order_code: `MA-${String(Number(o.month) + 1).padStart(2, '0')}${String(o.year).slice(-2)}-${o.id}`,
+      tracking_id: tracking, lines: snap.lines || [], detail: o.detail,
+      amount: Number(o.amount) || 0, advance: Number(o.advance) || 0,
+      business: snap.business || business || '',
+    };
+    let text = templateMessage(data);
+    // A template without [Tracking ID] would send a dispatch message with no tracking number.
+    if (tracking && !text.includes(tracking)) text += `\n\nTracking ID: ${tracking}`;
+    return { text, order_code: data.order_code };
+  }
+
   // ── public API ────────────────────────────────────────────
   // THE common WhatsApp function. Called by placeOrder() (AI + manual) AFTER the order and its
   // screenshots are committed. Returns true if it started; the job then runs in the background.
@@ -357,5 +377,5 @@ module.exports = function createWorkflow({ dbRun, dbGet, dbAll, screenshotRoot, 
       WHERE wa_status IN ('processing','opening')`);
   }
 
-  return { STEPS, processWhatsAppForOrder, retry, markSent, getStatus, recoverInterrupted, standardMessage };
+  return { STEPS, processWhatsAppForOrder, retry, markSent, getStatus, recoverInterrupted, standardMessage, dispatchMessage };
 };

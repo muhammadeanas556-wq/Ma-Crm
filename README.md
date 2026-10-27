@@ -53,3 +53,22 @@ Open Chrome → Extensions → Developer mode → **Load unpacked**, select the 
 **Existing data**: nothing is deleted or rewritten. Columns are added automatically on start. Orders created before this update have no owner and are treated as Admin orders, so Staff never see them and Admin sees them as before.
 
 **Definitions used in counts**: Pending = status *Processing*; Unpaid = any order not marked *Paid*.
+
+## Send Dispatch Message (WhatsApp click-to-chat) & staff-account lockdown (update)
+
+**Send Dispatch Message (Method 1)**
+- Where: the **📤 Dispatch** chip under each order's Tracking ID (Clients & Orders, My Orders, Dashboard), the **Send Dispatch Message** button on the panel shown right after **Place Order**, and the same button in **Edit Order**.
+- The panel loads the *saved* order from `GET /api/orders/:id/dispatch`: the customer's WhatsApp number (normalised by `phone.js` with its own country code; if the phone was edited after Place Order, the edited number is used), the message, and the original order image(s).
+- The message uses your existing `whatsapp-message.txt` template (same placeholders, e.g. `[Customer Name]`, `[Tracking ID]`), filled from the current saved order. Gemini is never used for it. If the template has no `[Tracking ID]`, a `Tracking ID:` line is added so the message is never sent without it. The message can be edited in the panel before opening WhatsApp.
+- **Open WhatsApp Chat** opens `web.whatsapp.com/send?phone=…&text=…` (or `wa.me/…` on a phone) in a single reusable tab, with the message pre-filled. **Copy image** puts the original image on the clipboard, so you paste it into the chat with Ctrl+V. **Download original** saves the exact original file, and **Open Original Image** opens it. Then press Send in WhatsApp and click **Mark as Sent**.
+- Statuses (separate columns, `dispatch_*`): *Ready to Send* → *WhatsApp Opened* → *Sent* (only when a person confirms it; it can be undone). The order status and courier status are never changed by this. The automatic extension sender (`wa_*`) is unchanged; if it already sent the order, the panel says so.
+- Missing or invalid phone, or missing tracking ID: the panel explains the problem and offers **Edit Order**. With no saved image, the message can still be sent.
+- Access: the same ownership rules as the rest of the CRM. Admin can use it on any order, and staff only on orders they placed. The image URLs need a login and are ownership-checked; they are not public.
+- Limitation: a WhatsApp link cannot attach a file or press Send. Pasting or attaching the image and pressing Send stays manual.
+
+**Staff can no longer create staff accounts by any route**
+- `/api/staff/add`, `/api/staff/update` and `DELETE /api/staff/:id` now also check for Admin on the route itself (403 for staff).
+- Fixed in `auth.js`: Express matches routes case-insensitively, but the login gate did not. `/API/staff/add` skipped the login check entirely, and `/api/Staff/add` skipped the owner-only list. The gate now lower-cases the path, which also closes the same hole on `/API/settings/set`, `/API/backup` and other paths.
+- The Staff Management card and the Add/Edit/Delete Staff dialogs are Admin-only in the UI, and their functions refuse to run for staff.
+
+**Database**: 6 new nullable columns on `orders` (`dispatch_status`, `dispatch_phone`, `dispatch_opened_at`, `dispatch_sent_at`, `dispatch_by_user_id`, `dispatch_by_name`), added automatically on start. Nothing existing is changed or deleted.
