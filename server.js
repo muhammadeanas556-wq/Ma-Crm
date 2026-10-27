@@ -10,6 +10,7 @@ const sqlite3  = require('sqlite3').verbose();
 const path     = require('path');
 const fs       = require('fs');
 const crypto   = require('crypto');
+const zlib     = require('zlib');
 
 // ── .env — GEMINI_API_KEY yahan rakhein, code mein nahi ────────
 // Own small reader so it works on every Node version and forgives
@@ -93,6 +94,53 @@ app.use((req, res, next) => {
 });
 app.use(express.json({ limit: '10mb' }));
 
+// ── GZIP COMPRESSION (built-in zlib, no extra npm package needed) ──────
+// public/index.html is ~370 KB of inline HTML/CSS/JS. On fast PC wifi this
+// barely registers, but on mobile data + a weaker phone CPU it visibly
+// slows down the login → dashboard load. Gzipping text responses typically
+// shrinks them 70-80%, which is the single biggest win for mobile speed
+// while staying on Render's free plan (no paid tier / extra service needed).
+const COMPRESSIBLE = /^(text\/|application\/javascript|application\/json|image\/svg\+xml)/;
+app.use((req, res, next) => {
+  const acceptEncoding = req.headers['accept-encoding'] || '';
+  if (!acceptEncoding.includes('gzip')) return next();
+
+  const originalWrite = res.write.bind(res);
+  const originalEnd   = res.end.bind(res);
+  let gzip = null;
+  let started = false;
+
+  function startGzipIfNeeded() {
+    if (started) return;
+    started = true;
+    const type = String(res.getHeader('Content-Type') || '');
+    if (res.headersSent || !COMPRESSIBLE.test(type) || res.getHeader('Content-Encoding')) return;
+    res.removeHeader('Content-Length'); // length changes once compressed
+    res.setHeader('Content-Encoding', 'gzip');
+    res.setHeader('Vary', 'Accept-Encoding');
+    gzip = zlib.createGzip();
+    gzip.on('data', chunk => originalWrite(chunk));
+    gzip.on('end', () => originalEnd());
+  }
+
+  res.write = (chunk, ...args) => {
+    startGzipIfNeeded();
+    if (gzip) { gzip.write(chunk); return true; }
+    return originalWrite(chunk, ...args);
+  };
+  res.end = (chunk, ...args) => {
+    startGzipIfNeeded();
+    if (gzip) { if (chunk) gzip.write(chunk); gzip.end(); return; }
+    return originalEnd(chunk, ...args);
+  };
+  next();
+});
+
+// ── STATIC CACHE HEADERS ─────────────────────────────────────
+// Repeat visits (same staff member reopening the app) load instantly
+// instead of re-downloading the same files every time.
+const STATIC_CACHE = { maxAge: '1d', etag: true };
+
 // Shared phone utility — the review form loads the SAME file the server uses
 app.get('/lib/phone.js', (req, res) => res.type('application/javascript').sendFile(path.join(__dirname, 'phone.js')));
 
@@ -106,7 +154,7 @@ app.get('/report', (req, res) => {
   }
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), STATIC_CACHE));
 
 // ── DATABASE SETUP ──────────────────────────────────────────
 // DATABASE_URL set → Supabase Postgres (permanent). Not set → local SQLite file.
