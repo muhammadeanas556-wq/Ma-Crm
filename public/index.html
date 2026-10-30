@@ -6,6 +6,7 @@
 <title>MA CRM</title>
 <link id="favicon" rel="icon" type="image/png" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233d7eff'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='monospace' font-weight='800' font-size='12' fill='white'%3EMA%3C/text%3E%3C/svg%3E"/>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/lucide@0.454.0/dist/umd/lucide.min.js"></script>
 <style>
 :root {
   /* Core palette — deep navy like Pixely screenshot */
@@ -53,6 +54,14 @@
   --r-md: 8px;
   --r-lg: 12px;
   --r-xl: 16px;
+
+  /* ─── Sidebar Design 1 — Modern Dark (scoped to .sidebar only) ─── */
+  --sb-bg:      #0B1729;
+  --sb-active:  #0866F5;
+  --sb-text:    #F8FAFC;
+  --sb-muted:   #94A3B8;
+  --sb-border:  rgba(148,163,184,0.14);
+  --sb-hover:   rgba(255,255,255,0.05);
 }
 
 *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -73,10 +82,10 @@ body {
    SIDEBAR
 ══════════════════════════════════════════ */
 .sidebar {
-  width: 280px;
+  width: 272px;
   flex-shrink: 0;
-  background: var(--bg2);
-  border-right: 1px solid var(--border);
+  background: var(--sb-bg);
+  border-right: 1px solid var(--sb-border);
   display: flex;
   flex-direction: column;
   position: fixed;
@@ -86,8 +95,8 @@ body {
 }
 
 .sb-logo {
-  padding: 24px 20px 20px;
-  border-bottom: 1px solid var(--border);
+  padding: 22px 20px 18px;
+  border-bottom: 1px solid var(--sb-border);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -95,89 +104,84 @@ body {
   position: relative;
 }
 .sb-logo-mark {
-  width: 46px; height: 46px;
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, #2563eb, var(--sb-active));
   border-radius: var(--r-md);
   display: flex; align-items: center; justify-content: center;
-  font-size: 18px; font-weight: 800; color: #fff;
+  font-size: 16px; font-weight: 800; color: #fff;
   font-family: var(--font);
-  box-shadow: 0 2px 12px rgba(37,99,235,.35);
+  box-shadow: 0 2px 12px rgba(8,102,245,.35);
   position: relative; overflow: hidden; flex-shrink: 0;
 }
 .sb-logo-name {
-  font-size: 26px; font-weight: 800;
-  color: var(--white); letter-spacing: -.01em;
+  font-size: 20px; font-weight: 800;
+  color: var(--sb-text); letter-spacing: -.01em;
 }
 .sb-logo-tag {
-  font-size: 13px; color: var(--muted);
+  font-size: 11px; color: var(--sb-muted);
   font-family: var(--mono); letter-spacing: .06em;
   margin-top: 2px;
 }
 
 .sb-nav {
-  flex: 1; padding: 16px 12px;
+  flex: 1; padding: 14px 14px;
   display: flex; flex-direction: column;
-  gap: 3px; overflow-y: auto;
+  gap: 2px; overflow-y: auto;
 }
 .sb-nav::-webkit-scrollbar { width: 3px; }
 .sb-nav::-webkit-scrollbar-track { background: transparent; }
-.sb-nav::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 2px; }
+.sb-nav::-webkit-scrollbar-thumb { background: var(--sb-border); border-radius: 2px; }
 
 .sb-label {
-  font-size: 12px; letter-spacing: .14em;
-  color: var(--muted); text-transform: uppercase;
-  font-family: var(--mono); padding: 12px 10px 5px;
+  font-size: 11px; letter-spacing: .1em;
+  color: var(--sb-muted); text-transform: uppercase;
+  font-family: var(--font); font-weight: 700;
+  padding: 16px 10px 6px;
 }
+.sb-label:first-child { padding-top: 4px; }
 .sb-item {
-  display: flex; align-items: center; gap: 14px;
-  padding: 13px 14px; border-radius: var(--r-md);
-  cursor: pointer; font-size: 17px; font-weight: 600;
-  color: var(--muted); transition: all .15s;
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 14px; border-radius: 10px;
+  cursor: pointer; font-size: 14.5px; font-weight: 600;
+  color: var(--sb-text); transition: background .15s, color .15s;
   border: 1px solid transparent; user-select: none;
-  letter-spacing: -.01em;
+  letter-spacing: -.01em; min-height: 44px;
 }
-.sb-item:hover { background: var(--bg3); color: var(--text); }
+.sb-item:hover { background: var(--sb-hover); color: var(--sb-text); }
 .sb-item.active {
-  background: var(--accent-dim);
-  color: var(--accent2);
-  border-color: rgba(59,130,246,0.2);
+  background: var(--sb-active);
+  color: #fff;
+  border-color: transparent;
 }
-.sb-item.add-item {
-  color: var(--green);
-  border-color: rgba(34,197,94,.12);
-  background: rgba(34,197,94,.04);
-}
-.sb-item.add-item:hover {
-  background: rgba(34,197,94,.1);
-  border-color: rgba(34,197,94,.25);
-}
-.sb-item.add-item.active {
-  background: rgba(34,197,94,.12);
-  border-color: rgba(34,197,94,.3);
-}
+.sb-item.active:hover { background: var(--sb-active); }
+.sb-item.add-item { color: var(--sb-text); border-color: transparent; background: transparent; }
+.sb-item.add-item:hover { background: var(--sb-hover); }
+.sb-item.add-item.active { background: var(--sb-active); color: #fff; }
 .sb-item .ic {
-  font-size: 22px; width: 26px; text-align: center; flex-shrink: 0;
+  width: 19px; height: 19px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
 }
+.sb-item .ic svg { width: 19px; height: 19px; stroke-width: 2px; }
 
 .sb-foot {
-  padding: 18px 20px;
-  border-top: 1px solid var(--border);
+  padding: 16px 18px 20px;
+  border-top: 1px solid var(--sb-border);
 }
 .sb-user { display: flex; align-items: center; gap: 12px; }
 .sb-avatar {
-  width: 42px; height: 42px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), #7c3aed);
+  width: 38px; height: 38px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--sb-active), #7c3aed);
   display: flex; align-items: center; justify-content: center;
-  font-size: 16px; font-weight: 800; color: #fff; flex-shrink: 0;
+  font-size: 15px; font-weight: 800; color: #fff; flex-shrink: 0;
 }
-.sb-uname { font-size: 18px; font-weight: 700; color: var(--white); }
-.sb-urole { font-size: 14px; color: var(--muted); font-family: var(--mono); }
+.sb-uname { font-size: 14.5px; font-weight: 700; color: var(--sb-text); }
+.sb-urole { font-size: 12px; color: var(--sb-muted); font-family: var(--font); }
 
 /* ══════════════════════════════════════════
    MAIN LAYOUT
 ══════════════════════════════════════════ */
 .main {
-  margin-left: 280px; flex: 1;
+  margin-left: 272px; flex: 1;
   display: flex; flex-direction: column; min-height: 100vh;
   overflow-x: hidden;
   min-width: 0;
@@ -1666,36 +1670,40 @@ body:not(.is-staff) .staff-only { display: none !important; }
     <input type="file" id="crm-logo-input" accept="image/*" style="display:none" onchange="handleCrmLogoUpload(this)"/>
   </div>
   <nav class="sb-nav">
-    <div class="sb-label">Navigation</div>
+    <div class="sb-label">Main Menu</div>
     <div class="sb-item active" id="nav-dashboard" onclick="showPage('dashboard',this)">
-      <span class="ic">◈</span>Dashboard
+      <span class="ic"><i data-lucide="layout-dashboard"></i></span>Dashboard
     </div>
-    <!-- Add Client — only visible to admin, green accent -->
+    <!-- Add Client — only visible to admin -->
     <div class="sb-item add-item" id="nav-addclient" onclick="showPage('addclient',this)">
-      <span class="ic">＋</span><span class="nav-txt">Add Client</span>
+      <span class="ic"><i data-lucide="user-plus"></i></span><span class="nav-txt">Add Client</span>
     </div>
     <div class="sb-item" id="nav-clients" onclick="showPage('clients',this)">
-      <span class="ic">≡</span><span class="nav-txt">Clients & Orders</span>
+      <span class="ic"><i data-lucide="users"></i></span><span class="nav-txt">Clients & Orders</span>
     </div>
+
+    <div class="sb-label">Management</div>
     <!-- Staff Orders — Admin only: monitor orders placed by Staff -->
     <div class="sb-item" id="nav-stafforders" onclick="showPage('stafforders',this)" style="display:none">
-      <span class="ic">👥</span>Staff Orders
-    </div>
-    <div class="sb-item" id="nav-report" onclick="showPage('report',this)">
-      <span class="ic">📊</span>Monthly Report
+      <span class="ic"><i data-lucide="clipboard-list"></i></span>Staff Orders
     </div>
     <div class="sb-item" id="nav-team" onclick="showPage('team',this)" style="display:none">
-      <span class="ic">👥</span>Team
+      <span class="ic"><i data-lucide="users-round"></i></span>Team
     </div>
+    <div class="sb-item" id="nav-report" onclick="showPage('report',this)">
+      <span class="ic"><i data-lucide="bar-chart-3"></i></span>Monthly Report
+    </div>
+
+    <div class="sb-label">Preferences</div>
     <div class="sb-item" id="nav-settings" onclick="showPage('team',this)" style="display:none">
-      <span class="ic">⚙️</span>Settings
+      <span class="ic"><i data-lucide="settings"></i></span>Settings
     </div>
     <div class="sb-item" id="nav-demo-account" onclick="showPage('demoaccount',this)" style="display:none">
-      <span class="ic">🎭</span>Demo Account
+      <span class="ic"><i data-lucide="drama"></i></span>Demo Account
     </div>
     <!-- My Profile — Staff only (Admin's profile lives on the Team page) -->
     <div class="sb-item" id="nav-myprofile" onclick="showPage('myprofile',this)" style="display:none">
-      <span class="ic">👤</span>My Profile
+      <span class="ic"><i data-lucide="user"></i></span>My Profile
     </div>
   </nav>
   <div class="sb-foot">
@@ -1705,8 +1713,9 @@ body:not(.is-staff) .staff-only { display: none !important; }
         <div class="sb-uname" id="sb-uname">Muhammad Anas</div>
         <div class="sb-urole" id="sb-role-label">Admin · MA Store</div>
       </div>
+      <i data-lucide="chevron-right" style="width:16px;height:16px;color:var(--sb-muted);margin-left:auto;flex-shrink:0"></i>
     </div>
-    <button onclick="doLogout()" style="margin-top:12px;width:100%;background:none;border:1px solid var(--border);color:var(--muted);padding:7px;border-radius:6px;cursor:pointer;font-size:10px;font-family:var(--mono);letter-spacing:.08em;transition:all .15s" onmouseover="this.style.borderColor='rgba(255,77,77,.4)';this.style.color='var(--red)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">⏻ Logout</button>
+    <button onclick="doLogout()" style="margin-top:14px;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:var(--sb-hover);border:1px solid var(--sb-border);color:var(--sb-text);padding:10px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;font-family:var(--font);transition:all .15s" onmouseover="this.style.borderColor='rgba(239,68,68,.4)';this.style.color='#f87171'" onmouseout="this.style.borderColor='var(--sb-border)';this.style.color='var(--sb-text)'"><i data-lucide="log-out" style="width:16px;height:16px"></i>Logout</button>
   </div>
 </aside>
 
@@ -7102,6 +7111,13 @@ detectRoute();
       catch(e){ m.textContent='❌ Server unreachable'; }
     };
   }
+})();
+</script>
+<script>
+// Render Lucide sidebar icons (Design 1). Safe no-op if the CDN didn't load.
+(function initSidebarIcons(){
+  if (window.lucide && typeof lucide.createIcons === 'function') { lucide.createIcons(); }
+  else { setTimeout(initSidebarIcons, 150); }
 })();
 </script>
 </body>
