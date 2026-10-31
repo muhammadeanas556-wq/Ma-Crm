@@ -56,6 +56,7 @@ const envInfo = { file: null, fromEnvVar: false, notes: [] };
   }
 })();
 const ai = require('./ai-import');
+const aiRouter = require('./ai-router');
 const phoneUtil   = require('./phone');
 const waSender    = require('./whatsapp-sender');
 const createWaFlow = require('./whatsapp-workflow');
@@ -77,6 +78,17 @@ const GEMINI_FALLBACK_MODELS = String(process.env.GEMINI_FALLBACK_MODELS || 'gem
   .split(',').map(m => m.trim().replace(/^models\//, '')).filter(m => m && m !== GEMINI_MODEL);
 // Result of the startup key check, shown in the Import modal
 let aiHealth = { state: GEMINI_API_KEY ? 'checking' : 'off', message: '' };
+
+// ── MULTI-MODEL EXTRACTION: performance store + extra providers ────
+// Gemini + NVIDIA keep using the battle-tested multi-key fallback chain
+// below (aiBuildChain / aiCallGeminiWithRetry) — untouched. ai-router.js
+// adds the 6 additional providers (Groq, Mistral, LLM7, Z AI, Cloudflare,
+// Kilo) on top, using the SAME `settings` table for its learned scores,
+// so routing across all configured providers improves automatically
+// without a second database or a second code path for Gemini.
+const aiPerf = aiRouter.createPerformanceStore({ dbGet, dbRun });
+const AI_OTHER_PROVIDERS = aiRouter.loadConfiguredProviders().filter(p => p.id !== 'gemini' && p.id !== 'nvidia');
+const AI_MULTI_ENABLED = AI_ENABLED || AI_OTHER_PROVIDERS.length > 0;
 
 const app  = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -924,12 +936,27 @@ const AI_USER_MESSAGES = {
 app.get('/api/ai/status', (req, res) => {
   res.json({
     success: true,
-    enabled: AI_ENABLED,
+    enabled: AI_MULTI_ENABLED,
     model: GEMINI_API_KEY ? GEMINI_MODEL : (NVIDIA_API_KEY ? NVIDIA_MODEL : null),
     backups: { geminiKeys: Math.max(0, GEMINI_KEYS.length - 1), nvidia: NVIDIA_API_KEY ? NVIDIA_MODEL : null },
+    extraProviders: AI_OTHER_PROVIDERS.map(p => p.label),
     maxImages: ai.LIMITS.MAX_IMAGES,
-    reason: AI_ENABLED ? null : (envInfo.file || envInfo.fromEnvVar ? (keyCheck.problem || 'empty') : 'no_env_file'),
+    reason: AI_MULTI_ENABLED ? null : (envInfo.file || envInfo.fromEnvVar ? (keyCheck.problem || 'empty') : 'no_env_file'),
     health: aiHealth,
+  });
+});
+
+// ── AI: PROVIDER PERFORMANCE (admin-only diagnostics panel) ──
+app.get('/api/ai/providers', requireAdmin, (req, res) => {
+  const configured = [
+    ...(AI_ENABLED ? [{ id: 'gemini', label: GEMINI_API_KEY ? 'Gemini' : 'Gemini (backup only)' }] : []),
+    ...(NVIDIA_API_KEY ? [{ id: 'nvidia', label: 'NVIDIA' }] : []),
+    ...AI_OTHER_PROVIDERS.map(p => ({ id: p.id, label: p.label, model: p.model })),
+  ];
+  const stats = aiPerf.snapshot();
+  res.json({
+    success: true,
+    providers: configured.map(p => ({ ...p, stats: stats[p.id] || null })),
   });
 });
 
@@ -1075,7 +1102,7 @@ function aiKeepOrderFieldsOnly(draft) {
 // ── AI: EXTRACT (returns a draft for review — saves nothing) ──
 app.post('/api/ai/extract', async (req, res) => {
   const ip = req.ip || (req.socket && req.socket.remoteAddress) || 'local';
-  if (!AI_ENABLED) return res.json({ success: false, code: 'config', message: AI_USER_MESSAGES.config });
+  if (!AI_MULTI_ENABLED) return res.json({ success: false, code: 'config', message: AI_USER_MESSAGES.config });
   if (aiInFlight.has(ip)) return res.json({ success: false, code: 'busy', message: 'An extraction is already running. Wait for it to finish.' });
   if (!aiRateOk(ip)) return res.json({ success: false, code: 'rate_limited', message: 'Too many extractions in a short time. Wait a few minutes.' });
 
@@ -1105,21 +1132,62 @@ app.post('/api/ai/extract', async (req, res) => {
 
     const total = images.length;
     const results = await aiMapLimit(images, 2, async (image, i) => {
-      const tag = `[AI import] screenshot ${i + 1}/${total} (model ${GEMINI_MODEL}, ${image.mime}, ${Math.max(1, Math.round(image.bytes / 1024))} KB)`;
-      try {
-        const out = await aiCallGeminiWithRetry({
-          apiKey: GEMINI_API_KEY, model: GEMINI_MODEL, image, index: i + 1, total,
-          onLog: msg => console.warn(`${tag} ${msg}`),
-        }, msg => console.warn(`${tag} ${msg}`), reqCtrl.signal);
-        const data = ai.validateParcel(out.data);
-        console.log(`${tag} OK via ${out.provider || 'Gemini'} ("${out.variant}" request)`);
-        return { index: i + 1, ok: true, data };
-      } catch (e) {
-        const code = e.code || 'upstream';
-        console.warn(`${tag} FAILED — ${code}: ${e.message}${e.detail ? ' | ' + e.detail : ''}`);
-        if (code === 'config') aiHealth = { state: 'key_rejected', message: e.message };
-        return { index: i + 1, ok: false, code, error: e.message, detail: e.detail || null };
+      const tag = `[AI import] screenshot ${i + 1}/${total} (${image.mime}, ${Math.max(1, Math.round(image.bytes / 1024))} KB)`;
+      const log = msg => console.warn(`${tag} ${msg}`);
+
+      // Stage 1 — the proven Gemini(+key fallback)/NVIDIA chain, untouched.
+      let legacy = null, legacyScore = -1, legacyValidated = null;
+      if (AI_ENABLED) {
+        const started = Date.now();
+        try {
+          const out = await aiCallGeminiWithRetry({
+            apiKey: GEMINI_API_KEY, model: GEMINI_MODEL, image, index: i + 1, total, onLog: log,
+          }, log, reqCtrl.signal);
+          legacyValidated = ai.validateParcel(out.data);
+          legacyScore = aiRouter.validationScore(legacyValidated);
+          aiPerf.recordSuccess('gemini', { processingTimeMs: Date.now() - started, validationScore: legacyScore });
+          legacy = { ok: true, data: legacyValidated, providerLabel: out.provider || 'Gemini' };
+          console.log(`${tag} OK via ${out.provider || 'Gemini'} (validation ${legacyScore.toFixed(2)}, "${out.variant}" request)`);
+        } catch (e) {
+          const code = e.code || 'upstream';
+          if (code !== 'aborted') aiPerf.recordFailure('gemini', { rateLimited: code === 'rate_limited' });
+          console.warn(`${tag} Gemini/NVIDIA chain FAILED — ${code}: ${e.message}${e.detail ? ' | ' + e.detail : ''}`);
+          if (code === 'config') aiHealth = { state: 'key_rejected', message: e.message };
+          if (code === 'aborted') throw e;
+          legacy = { ok: false, code, error: e.message, detail: e.detail || null };
+        }
       }
+
+      // Stage 1 result already good, or no other providers configured → done.
+      if (legacy && legacy.ok && (aiRouter.isGoodEnough(legacyValidated, legacyScore) || !AI_OTHER_PROVIDERS.length)) {
+        return { index: i + 1, ok: true, data: legacyValidated };
+      }
+
+      // Stage 2/3 — low-confidence or failed legacy result: bring in the other
+      // configured providers, scored/staged/cross-verified by ai-router.js.
+      if (AI_OTHER_PROVIDERS.length) {
+        log(legacy && legacy.ok ? 'Gemini result uncertain — checking another AI model' : 'trying other configured AI providers');
+        try {
+          const routed = await aiRouter.extractImage({ perf: aiPerf }, AI_OTHER_PROVIDERS, image, i + 1, total, { log, signal: reqCtrl.signal, maxProviders: 3 });
+          if (routed.ok) {
+            // Prefer whichever of (legacy, routed) scored higher.
+            const routedScore = aiRouter.validationScore(routed.data);
+            if (legacy && legacy.ok && legacyScore >= routedScore) {
+              console.log(`${tag} kept Gemini result (${legacyScore.toFixed(2)} ≥ ${routedScore.toFixed(2)})`);
+              return { index: i + 1, ok: true, data: legacyValidated };
+            }
+            console.log(`${tag} OK via ${routed.provider.label} (validation ${routedScore.toFixed(2)})`);
+            return { index: i + 1, ok: true, data: routed.data };
+          }
+        } catch (e) {
+          if (e.code === 'aborted') throw e;
+          log(`other providers failed too: ${e.message}`);
+        }
+      }
+
+      if (legacy && legacy.ok) return { index: i + 1, ok: true, data: legacyValidated };   // uncertain, but still something
+      const code = (legacy && legacy.code) || 'config';
+      return { index: i + 1, ok: false, code, error: (legacy && legacy.error) || AI_USER_MESSAGES.config, detail: legacy && legacy.detail };
     });
 
     if (reqCtrl.signal.aborted || res.writableEnded) {
@@ -1723,6 +1791,7 @@ function startWhatsApp() {
 
 // ── START SERVER ────────────────────────────────────────────
 initDB().then(async () => {
+  await aiPerf.load();
   await waFlow.recoverInterrupted();
   cleanScreenshotTmp();
   setInterval(cleanScreenshotTmp, 60 * 60 * 1000).unref();
