@@ -85,12 +85,22 @@ async function extractGenericText(image, signal) {
 const PHONE_RE = /(?<!\d)(?:\+?92[\s-]?3\d{2}|03\d{2}|3\d{2})[\s-]?\d{3}[\s-]?\d{4}(?!\d)/g;
 const COD_LABEL_RE = /(?:COD|CASH ON DELIVERY|COLLECT AMOUNT|AMOUNT)\s*[:#\-]?\s*(?:RS\.?|PKR)?\s*([\d,]{2,})/i;
 const BARE_AMOUNT_RE = /(?:RS\.?|PKR)\s*([\d,]{2,})/i;
-const TRACKING_LABEL_RE = /(?:AWB|TRACKING|CONSIGNMENT|CN|SHIPMENT)\s*(?:NO\.?|NUMBER|ID|#)?\s*[:#\-]?\s*([A-Z0-9][A-Z0-9\-]{3,24})/i;
+// Require: a real label word, THEN an explicit "No"/"Number"/"ID"/"#" qualifier or a
+// colon/dash separator (not just whitespace — bare "Shipment" next to other printed
+// text, e.g. branding like "COD Retail Shipment", must not match), AND the captured
+// value must contain at least one digit (a plain word like "AWBNo" bleeding in from a
+// neighboring label, as happened on a real slip, is all letters and gets rejected).
+const TRACKING_LABEL_RE = /(?:AWB|TRACKING|CONSIGNMENT|CN)\s*(?:NO\.?|NUMBER|ID|#)?\s*[:#\-]\s*([A-Z0-9][A-Z0-9\-]{3,24}\d)(?=\s|$)/i;
 const NAME_LABEL_RE = /(?:NAME|RECEIVER|CONSIGNEE|TO)\s*[:#\-]\s*([A-Za-z][A-Za-z .]{2,40})/i;
-const ADDRESS_LABEL_RE = /(?:ADDRESS|DELIVERY ADDRESS)\s*[:#\-]\s*([^\n]{5,200})/i;
 
+// Only these 4 are actually needed from RapidOCR (product name is entered manually,
+// and address is left to the existing CRM review flow rather than chased here) — this
+// is a deliberately small, fast regex pass, not a full-document read. Anything one of
+// these 4 patterns doesn't confidently match is simply left null; the CRM's existing
+// "check it yourself" review step (ai.validateParcel's own confidence flags) is what
+// surfaces that to the user, so no separate unclear-field bookkeeping is added here.
 function guessParcelFields(text) {
-  const raw = { client_name: null, phone_number: null, other_phones: [], tracking_id: null, cod_amount: null, address: null, unclear_fields: [] };
+  const raw = { client_name: null, phone_number: null, other_phones: [], tracking_id: null, cod_amount: null };
   if (!text) return raw;
 
   const phones = [...new Set((text.match(PHONE_RE) || []).map(p => p.trim()))];
@@ -102,25 +112,23 @@ function guessParcelFields(text) {
   const codMatch = text.match(COD_LABEL_RE) || text.match(BARE_AMOUNT_RE);
   if (codMatch) raw.cod_amount = codMatch[1];
 
-  const trkMatch = text.match(TRACKING_LABEL_RE);
-  if (trkMatch) raw.tracking_id = trkMatch[1];
+  // A courier slip often prints the AWB/tracking number twice (once on a sticker
+  // overlapping other text, once cleanly in the printed body) — OCR frequently
+  // mangles the sticker occurrence by merging it with neighboring text. Instead of
+  // taking the first match, collect every candidate and keep the longest: a merged/
+  // truncated misread is reliably shorter than the real value.
+  const trkCandidates = [...text.matchAll(new RegExp(TRACKING_LABEL_RE, 'gi'))].map(m => m[1]);
+  if (trkCandidates.length) {
+    raw.tracking_id = trkCandidates.reduce((best, c) => (c.length > best.length ? c : best));
+  }
 
   const nameMatch = text.match(NAME_LABEL_RE);
   if (nameMatch) raw.client_name = nameMatch[1].trim();
 
-  const addrMatch = text.match(ADDRESS_LABEL_RE);
-  if (addrMatch) raw.address = addrMatch[1].trim();
-
-  // No label-anchored name/address found — these two fields have no distinctive
-  // value shape to fall back on (unlike phone/COD/tracking), so leave them null
-  // rather than guessing and mark them unclear for confidence scoring downstream.
-  if (!raw.client_name) raw.unclear_fields.push('client_name');
-  if (!raw.address) raw.unclear_fields.push('address');
-
   return raw;
 }
 
-// How many of the parcel fields a guess actually filled — used to decide whether
+// How many of the 4 required fields a guess actually filled — used to decide whether
 // RapidOCR's result is "sufficient" or whether to fall back to the existing
 // Gemini/NVIDIA provider (avoids a confident-looking but near-empty draft winning
 // over a provider that could have read the screenshot properly).
@@ -130,7 +138,6 @@ function filledCount(raw) {
   if (raw.phone_number) n++;
   if (raw.tracking_id) n++;
   if (raw.cod_amount) n++;
-  if (raw.address) n++;
   return n;
 }
 
@@ -139,7 +146,7 @@ function filledCount(raw) {
 // `minFilled` lets the caller decide what counts as "sufficient" before it skips
 // the fallback provider (section 3 of the integration task: avoid duplicate OCR
 // requests only once the first provider already returned enough).
-async function tryRapidOcr(image, { signal = null, minFilled = 2 } = {}) {
+async function tryRapidOcr(image, { signal = null, minFilled = 3 } = {}) {
   if (!RAPIDOCR_ENABLED) {
     const e = new Error('RapidOCR disabled (RAPIDOCR_ENABLED=0)');
     e.code = 'disabled';
