@@ -1049,7 +1049,7 @@ async function aiMapLimit(items, limit, fn) {
 // otherwise the review form uses the CRM default ("Safoof").
 // Everything else the model returns (email, notes, ...) is dropped here.
 const AI_CLIENT_FIELDS = ['name', 'phones', 'phone_unreadable', 'address'];
-const AI_ORDER_FIELDS  = ['tracking_id', 'cod_amount', 'lines', 'items'];
+const AI_ORDER_FIELDS  = ['tracking_id', 'cod_amount', 'lines', 'items', 'product_name'];
 function aiKeepOrderFieldsOnly(draft) {
   if (!draft || typeof draft !== 'object') return draft;
   const pick = (obj, keys) => {
