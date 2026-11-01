@@ -26,41 +26,9 @@ function toBase64(buf) {
   return btoa(bin);
 }
 
-// Dispatch → "Open Chat": the CRM asks for a customer's chat. Only a plain WhatsApp Web
-// click-to-chat link is accepted (rebuilt from its parsed parts), so a compromised page cannot
-// use this to open arbitrary sites.
-function safeChatUrl(raw) {
-  try {
-    const u = new URL(String(raw || ''));
-    if (u.origin !== 'https://web.whatsapp.com' || u.pathname !== '/send') return null;
-    const phone = u.searchParams.get('phone') || '';
-    const text = u.searchParams.get('text') || '';
-    if (!/^\d{8,15}$/.test(phone) || text.length > 4000) return null;
-    const out = new URL('https://web.whatsapp.com/send');
-    out.searchParams.set('phone', phone);
-    if (text) out.searchParams.set('text', text);
-    return out.toString();
-  } catch (e) { return null; }
-}
-
 async function handle(msg, sender) {
   const tab = sender.tab;
   switch (msg.type) {
-    case 'open-chat': {
-      const target = safeChatUrl(msg.url);
-      if (!target) return { ok: false, error: 'invalid chat link' };
-      const tabs = await chrome.tabs.query({ url: 'https://web.whatsapp.com/*' });
-      if (tabs.length) {
-        // Reuse the WhatsApp Web tab that is already open (prefer the one in the CRM's own window).
-        // Same browser profile → the logged-in WhatsApp session is preserved. No new tab is created.
-        const pick = tabs.find(t => tab && t.windowId === tab.windowId) || tabs[0];
-        await chrome.tabs.update(pick.id, { url: target, active: true });
-        await chrome.windows.update(pick.windowId, { focused: true }).catch(e => console.warn('[MA CRM WhatsApp] focus window:', e.message));
-        return { ok: true, mode: 'reused', tabs: tabs.length };
-      }
-      await chrome.tabs.create({ url: target, active: true, windowId: tab ? tab.windowId : undefined });   // fallback: none open
-      return { ok: true, mode: 'created' };
-    }
     case 'crm-poll': {
       if (tab && tab.url) await chrome.storage.local.set({ crmBase: new URL(tab.url).origin });
       const r = await post('/api/wa-bridge/crm-poll', { version: VERSION });

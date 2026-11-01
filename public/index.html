@@ -4654,7 +4654,7 @@ function renderRows(rows, bodyId, emptyId, countId) {
       const hasSs = getOrderScreenshots(r.id).length > 0 || r.screenshot_count > 0;
       if (['pending', 'processing', 'opening'].includes(r.wa_status) && !waPolls.has(r.id)) { waPolls.set(r.id, 'busy'); setTimeout(() => waPoll(r.id), 0); }
       const waLbl = { sent: ['sent', 'WA ✓', 'WhatsApp sent'], failed: ['failed', 'WA ✕', 'WhatsApp message check failed — click for details'] }[r.wa_status] || ['busy', 'WA …', 'WhatsApp sending'];
-      const waBadge = r.wa_status ? `<button type="button" class="tc-wa tc-wa-${waLbl[0]}" onclick="waShowProgress(${r.id})" title="${waLbl[2]}">${waLbl[1]}</button>` : '';
+      const waBadge = r.wa_status === 'sent' ? `<button type="button" class="tc-wa tc-wa-${waLbl[0]}" onclick="waShowProgress(${r.id})" title="${waLbl[2]}">${waLbl[1]}</button>` : '';
       const dispBadge = dispatchChip(r);
       const ssBtn = `<button class="tc-ss-btn${hasSs?' has-ss':''}" onclick="openOrderSsViewer(${r.id},'${esc(makeOrderId(r))}')" title="${hasSs?'Screenshots dekhen':'Koi screenshot nahi'}">📸</button>`;
       return `<div class="tbl-row tbl-admin">
@@ -6736,7 +6736,7 @@ async function waPoll(orderId, tries = 0) {
   try { res = await apiFetch(`/api/orders/${orderId}/whatsapp`); } catch (e) { console.warn('[CRM]', e); }
   if (res && res.success) {
     const st = res.whatsapp;
-    const active = ['pending', 'processing', 'opening'].includes(st.status) || st.running;
+    const active = ['pending', 'processing', 'opening'].includes(st.status) && !waChecksDone(st);
     if (active) waPolls.set(orderId, setTimeout(() => waPoll(orderId), 1200));
     else waPolls.delete(orderId);
     if (waView.orderId === orderId && aiState.step === 'progress') waRenderProgress(st);
@@ -6763,19 +6763,23 @@ function waApplyToRow(orderId, st) {
   if (typeof renderDashList === 'function') renderDashList();
 }
 
+// Only the two remaining checks can fail. Anything else the server reports (old automatic-sending
+// states) is ignored: the order is placed, and "dispatched" is decided only by the Dispatch function.
+const waCheckFailed = st => st.status === 'failed' && ['message', 'phone'].includes(st.step);
+const waChecksDone = st => !st.status || (st.progress && st.progress.message === 'done' && st.progress.phone === 'done');
 function waHeadline(st) {
-  if (st.status === 'failed') return ['is-failed', ({
+  if (waCheckFailed(st)) return ['is-failed', ({
     message: 'Order placed successfully. WhatsApp message generation failed.',
     phone:   'Order placed successfully. Customer number is not valid for WhatsApp.',
-  })[st.step] || 'Order placed successfully. WhatsApp message could not be prepared.'];
-  if (st.status) return ['', 'Order placed. Preparing WhatsApp message…'];
+  })[st.step]];
+  if (!waChecksDone(st)) return ['', 'Order placed. Preparing WhatsApp message…'];
   return ['is-sent', 'Order placed successfully.'];
 }
 
 function waRenderProgress(st) {
   waView.last = st;
   const p = st.progress || {};
-  const stepState = key => ['validated', 'saved', 'id'].includes(key) ? 'done' : (p[key] || (st.status ? 'todo' : 'done'));
+  const stepState = key => ['validated', 'saved', 'id'].includes(key) ? 'done' : (p[key] || (waChecksDone(st) ? 'done' : 'todo'));
   const note = {
     id:    st.order_code || ('#' + st.order_id),
     phone: st.phone || '',
@@ -6787,7 +6791,7 @@ function waRenderProgress(st) {
   }).join('');
 
   const [cls, head] = waHeadline(st);
-  const failed = st.status === 'failed';
+  const failed = waCheckFailed(st);
   const err = failed ? `<div class="wa-err">${esc(st.error || 'Unknown error')}</div>` : '';
   const msg = st.message ? `<details class="wa-msg"><summary>Message${st.message_source === 'template' ? ' (your template)' : st.message_source === 'standard' ? ' (standard wording)' : st.message_source === 'gemini' ? ' (Gemini)' : ''}</summary><pre>${esc(st.message)}</pre></details>` : '';
 
