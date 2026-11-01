@@ -2744,19 +2744,6 @@ body:not(.is-staff) .staff-only { display: none !important; }
   </div>
 </div>
 
-<!-- CONNECT WHATSAPP (link WhatsApp Web once by QR) -->
-<div class="overlay" id="waConnectModal">
-  <div class="modal wa-connect" role="dialog" aria-modal="true" aria-labelledby="waConnectTitle">
-    <h3 id="waConnectTitle">Connect WhatsApp</h3>
-    <div id="waConnectBody" class="wa-connect-text"></div>
-    <div class="form-actions" style="margin-top:16px">
-      <button type="button" class="btn btn-blue" id="waTestBtn" onclick="waSendTest(this)" style="display:none">Send test message</button>
-      <button type="button" class="btn btn-outline" id="waUnlinkBtn" onclick="waUnlink()" style="display:none">Unlink</button>
-      <button type="button" class="btn btn-outline" onclick="waCloseConnect()">Close</button>
-    </div>
-  </div>
-</div>
-
 <div class="toast" id="toast"></div>
 
 <!-- ORDER SCREENSHOT VIEWER MODAL -->
@@ -4666,7 +4653,7 @@ function renderRows(rows, bodyId, emptyId, countId) {
           : `<span class="tc-pending-zero">Rs 0</span>`;
       const hasSs = getOrderScreenshots(r.id).length > 0 || r.screenshot_count > 0;
       if (['pending', 'processing', 'opening'].includes(r.wa_status) && !waPolls.has(r.id)) { waPolls.set(r.id, 'busy'); setTimeout(() => waPoll(r.id), 0); }
-      const waLbl = { sent: ['sent', 'WA ✓', 'WhatsApp sent'], failed: ['failed', 'WA ✕', 'WhatsApp failed — click to Retry'] }[r.wa_status] || ['busy', 'WA …', 'WhatsApp sending'];
+      const waLbl = { sent: ['sent', 'WA ✓', 'WhatsApp sent'], failed: ['failed', 'WA ✕', 'WhatsApp message check failed — click for details'] }[r.wa_status] || ['busy', 'WA …', 'WhatsApp sending'];
       const waBadge = r.wa_status ? `<button type="button" class="tc-wa tc-wa-${waLbl[0]}" onclick="waShowProgress(${r.id})" title="${waLbl[2]}">${waLbl[1]}</button>` : '';
       const dispBadge = dispatchChip(r);
       const ssBtn = `<button class="tc-ss-btn${hasSs?' has-ss':''}" onclick="openOrderSsViewer(${r.id},'${esc(makeOrderId(r))}')" title="${hasSs?'Screenshots dekhen':'Koi screenshot nahi'}">📸</button>`;
@@ -6325,22 +6312,6 @@ function aiUpdateWaLine() {
   renderWaLine(aiById('ai-wa-line'), [...tagged, ...all.filter(x => !tagged.includes(x))]);
 }
 
-async function aiRefreshWaSession() {
-  const el = aiById('aiWaSession');
-  if (!el) return;
-  let s = null;
-  try { const r = await apiFetch('/api/whatsapp/session'); s = r && r.success ? r.session : null; } catch (e) { console.warn('[CRM]', e); }
-  if (!aiById('aiWaSession')) return;
-  if (!s) { el.className = 'ai-wa-session is-warn'; el.innerHTML = '<span class="wa-dot"></span>WhatsApp status maloom nahi'; return; }
-  if (s.state === 'ready') {
-    el.className = 'ai-wa-session is-ready';
-    el.innerHTML = '<span class="wa-dot"></span>WhatsApp Web (is browser) connected';
-  } else {
-    const txt = { no_extension: 'CRM WhatsApp extension is browser mein nahi mila', no_tab: 'WhatsApp Web tab khula nahi (Place Order par khud khul jayega)', not_logged_in: 'WhatsApp Web tab mein login nahi' }[s.state] || 'WhatsApp connected nahi';
-    el.className = 'ai-wa-session is-warn';
-    el.innerHTML = `<span class="wa-dot"></span>${txt} — order phir bhi save hoga, WhatsApp baad mein Retry. <button type="button" onclick="waOpenConnect()">Connect WhatsApp</button>`;
-  }
-}
 
 function aiProductOptions(selected) {
   return '<option value="">— Select Product —</option>' +
@@ -6520,7 +6491,6 @@ function aiRenderReview(draft) {
       <button type="button" class="btn btn-green" id="aiPlaceOrderBtn" onclick="aiSave()">Place Order</button>
       <button type="button" class="btn btn-outline ai-cancel" onclick="aiRequestClose()">Cancel</button>
       <div class="ai-footer-hint">Place Order: pehle order save hoga, phir customer ko WhatsApp par original screenshot + message jayega. Is se pehle kuch nahi jata.</div>
-      <div class="ai-wa-session" id="aiWaSession"><span class="wa-dot"></span>WhatsApp status check ho raha hai…</div>
     </div>`;
   // Mark the prefilled reading on conflict fields
   document.querySelectorAll('#aiStepReview [data-ai-for]').forEach(w => {
@@ -6529,7 +6499,6 @@ function aiRenderReview(draft) {
   });
   aiUpdateRemaining();
   aiUpdateWaLine();
-  aiRefreshWaSession();
   aiUpdateMissingNote();
 }
 
@@ -6744,12 +6713,7 @@ const WA_STEPS = [
   ['id',        'Order ID generated'],
   ['message',   'WhatsApp message generated'],
   ['phone',     'Customer number checked'],
-  ['open',      'WhatsApp Web opening (this browser)'],
-  ['chat',      'Customer chat opened'],
-  ['attach',    'Original screenshot attached'],
-  ['send',      'Message sent'],
 ];
-const WA_ASK_FIRST = ['send_failed', 'partial', 'interrupted_sending'];   // might have reached the customer
 
 function waShowProgress(orderId) {
   const modal = aiById('aiImportModal');
@@ -6800,29 +6764,21 @@ function waApplyToRow(orderId, st) {
 }
 
 function waHeadline(st) {
-  if (st.status === 'sent') return ['is-sent', 'Order placed. WhatsApp confirmation sent.'];
-  if (!st.status) return ['is-failed', 'Order placed successfully. WhatsApp was not started.'];
-  if (st.status !== 'failed') return ['', 'Order placed. Sending WhatsApp confirmation…'];
-  if (st.error_code === 'interrupted' || st.error_code === 'interrupted_sending') return ['is-failed', 'Order placed successfully. WhatsApp was interrupted.'];
-  return ['is-failed', ({
+  if (st.status === 'failed') return ['is-failed', ({
     message: 'Order placed successfully. WhatsApp message generation failed.',
     phone:   'Order placed successfully. Customer number is not valid for WhatsApp.',
-    open:    'Order placed successfully. WhatsApp could not be opened.',
-    chat:    'Order placed successfully. Customer chat could not be opened.',
-    attach:  'WhatsApp opened, but the order screenshot could not be attached.',
-    send:    st.parts_sent > 0 ? 'Message sent, but not every screenshot was delivered.' : 'Order placed successfully. WhatsApp message was not sent.',
-  })[st.step] || 'Order placed successfully. WhatsApp could not be completed.'];
+  })[st.step] || 'Order placed successfully. WhatsApp message could not be prepared.'];
+  if (st.status) return ['', 'Order placed. Preparing WhatsApp message…'];
+  return ['is-sent', 'Order placed successfully.'];
 }
 
 function waRenderProgress(st) {
   waView.last = st;
   const p = st.progress || {};
-  const stepState = key => ['validated', 'saved', 'id'].includes(key) ? 'done' : (p[key] || 'todo');
+  const stepState = key => ['validated', 'saved', 'id'].includes(key) ? 'done' : (p[key] || (st.status ? 'todo' : 'done'));
   const note = {
-    id:     st.order_code || ('#' + st.order_id),
-    chat:   st.phone || '',
-    attach: st.screenshots ? `${st.screenshots} original` : '',
-    send:   st.status === 'sent' && st.sent_at ? new Date(st.sent_at.replace(' ', 'T') + 'Z').toLocaleString('en-PK') : '',
+    id:    st.order_code || ('#' + st.order_id),
+    phone: st.phone || '',
   };
   const icon = { done: '✓', failed: '✕', running: '', todo: '○' };
   const steps = WA_STEPS.map(([key, label]) => {
@@ -6831,119 +6787,25 @@ function waRenderProgress(st) {
   }).join('');
 
   const [cls, head] = waHeadline(st);
-  const canRetry = st.status === 'failed' || !st.status;
-  const waState = st.status === 'sent' ? ['ok', 'Sent'] : canRetry ? ['bad', st.status ? 'Failed' : 'Not started'] : ['busy', st.status === 'pending' ? 'Pending' : 'Processing'];
-
-  let err = '';
-  if (st.status === 'failed') {
-    let fix = '';
-    if (st.error_code === 'no_extension') fix = '<br>“MA CRM WhatsApp” extension install karein (Connect WhatsApp mein tareeqa likha hai), CRM tab refresh karein, phir Retry WhatsApp.';
-    else if (st.error_code === 'no_tab') fix = '<br>Isi browser mein web.whatsapp.com kholein (ya refresh karein), phir Retry WhatsApp.';
-    else if (st.error_code === 'not_linked') fix = '<br>Isi browser ke WhatsApp Web tab mein login karein, phir Retry WhatsApp.';
-    else if (['not_ready', 'timeout', 'not_installed'].includes(st.error_code)) fix = '<br>WhatsApp Web tab refresh karein, phir Retry WhatsApp. Connect WhatsApp mein status dekhein.';
-    else if (WA_ASK_FIRST.includes(st.error_code)) fix = '<br>Retry se pehle customer ki WhatsApp chat check karein — agar message wahan hai to “Already sent” dabayein.';
-    err = `<div class="wa-err">${esc(st.error || 'Unknown error')}${fix}</div>`;
-  }
-
-  const msg = st.message ? `<details class="wa-msg" ${st.status !== 'sent' ? 'open' : ''}><summary>Message${st.message_source === 'template' ? ' (your template)' : st.message_source === 'standard' ? ' (standard wording)' : st.message_source === 'gemini' ? ' (Gemini)' : ''}</summary><pre>${esc(st.message)}</pre></details>` : '';
+  const failed = st.status === 'failed';
+  const err = failed ? `<div class="wa-err">${esc(st.error || 'Unknown error')}</div>` : '';
+  const msg = st.message ? `<details class="wa-msg"><summary>Message${st.message_source === 'template' ? ' (your template)' : st.message_source === 'standard' ? ' (standard wording)' : st.message_source === 'gemini' ? ' (Gemini)' : ''}</summary><pre>${esc(st.message)}</pre></details>` : '';
 
   const id = st.order_id;
-  let buttons = '';
-  if (canRetry) {
-    buttons += `<button type="button" class="btn btn-green" onclick="waRetry(${id}, false, this)">Retry WhatsApp</button>`;
-    if (st.step === 'message') buttons += `<button type="button" class="btn btn-outline" onclick="waRetry(${id}, true, this)">Use standard message</button>`;
-    if (['no_extension', 'no_tab', 'not_linked', 'not_ready', 'timeout', 'not_installed'].includes(st.error_code)) buttons += `<button type="button" class="btn btn-outline" onclick="waOpenConnect()">Connect WhatsApp</button>`;
-    if (WA_ASK_FIRST.includes(st.error_code)) buttons += `<button type="button" class="btn btn-outline" onclick="waMarkSent(${id}, this)">Already sent</button>`;
-  }
-  // (The "Send Dispatch Message" button used to repeat here. Dispatch is still one click away from the
-  //  📤 Dispatch chip on the order row and from Edit Order, so this panel stays WhatsApp-only.)
-  buttons += `<button type="button" class="btn btn-outline wa-close" onclick="aiRequestClose()">Close</button>`;
+  // Dispatch (restored from the previous CRM): available as soon as the order is saved.
+  const buttons = `<button type="button" class="btn btn-blue" onclick="openDispatch(${id})" title="WhatsApp chat khol kar dispatch message tayyar karein">📤 Send Dispatch Message</button>`
+    + `<button type="button" class="btn btn-outline wa-close" onclick="aiRequestClose()">Close</button>`;
 
   aiById('aiStepProgress').innerHTML = `
     <div class="wa-prog-head ${cls}">${esc(head)}</div>
-    <div class="wa-prog-sub">${st.status === 'sent' || canRetry ? 'Order safely saved hai — WhatsApp ki koi bhi ghalti order ko delete ya change nahi karti.' : 'Window band kar saktay hain — WhatsApp server par chalta rahega. Order list mein “WA” se status dekhein.'}</div>
+    <div class="wa-prog-sub">Order safely saved hai. WhatsApp message “Send Dispatch Message” se bheja jata hai.</div>
     <div class="wa-split">
       <div class="ok">Order<b>Saved · ${esc(st.order_code || '#' + id)}</b></div>
-      <div class="${waState[0]}">WhatsApp<b>${waState[1]}</b></div>
     </div>
     <ol class="wa-steps">${steps}</ol>
     ${err}
     ${msg}
     <div class="wa-actions">${buttons}</div>`;
-}
-
-async function waRetry(orderId, standard, btn) {
-  const st = waView.last;
-  if (st && WA_ASK_FIRST.includes(st.error_code) &&
-      !confirm('Pehle customer ki WhatsApp chat check karein.\n\nKya message wahan NAHI pohncha? OK = dobara bhejein.')) return;
-  if (btn) btn.disabled = true;
-  try {
-    const res = await apiFetch(`/api/orders/${orderId}/whatsapp/retry`, { method: 'POST', body: JSON.stringify({ standard: !!standard }) });
-    if (!res || !res.success) toast((res && res.message) || 'Retry shuru nahi hua', false);
-  } catch (e) { toast('Server se connect nahi hua', false); }
-  waPoll(orderId);
-}
-
-async function waMarkSent(orderId, btn) {
-  if (!confirm('Kya aap ne customer ki chat mein message aur screenshot dekh liye hain? OK = “sent” mark karein (dobara nahi bhejenge).')) return;
-  if (btn) btn.disabled = true;
-  try {
-    const res = await apiFetch(`/api/orders/${orderId}/whatsapp/mark-sent`, { method: 'POST', body: '{}' });
-    if (!res || !res.success) toast((res && res.message) || 'Mark nahi hua', false);
-  } catch (e) { toast('Server se connect nahi hua', false); }
-  waPoll(orderId);
-}
-
-// ── CONNECT WHATSAPP (QR) ───────────────────────────────────
-let waConnectTimer = null;
-function waOpenConnect() {
-  aiById('waConnectModal').classList.add('open');
-  aiById('waConnectBody').innerHTML = '<div class="ai-loading" style="padding:20px 0"><div class="ai-spinner" aria-hidden="true"></div></div>';
-  waConnectTick(true);
-}
-function waCloseConnect() {
-  aiById('waConnectModal').classList.remove('open');
-  clearTimeout(waConnectTimer); waConnectTimer = null;
-  if (aiState.step === 'review') aiRefreshWaSession();
-}
-async function waConnectTick(first) {
-  clearTimeout(waConnectTimer);
-  if (!aiById('waConnectModal').classList.contains('open')) return;
-  let s = null;
-  try { const r = await apiFetch('/api/whatsapp/session'); s = r && r.success ? r.session : null; }
-  catch (e) { console.warn('[CRM] WhatsApp status:', e); }
-  const body = aiById('waConnectBody');
-  aiById('waUnlinkBtn').style.display = 'none';
-  aiById('waTestBtn').style.display = s && s.state === 'ready' ? '' : 'none';
-  const how = '<p style="margin-top:10px;color:var(--muted);font-size:12px">CRM koi naya browser nahi kholta. WhatsApp isi browser ke logged-in WhatsApp Web tab se jata hai — QR scan ki zaroorat nahi.</p>';
-  if (!s) body.innerHTML = 'CRM server se connect nahi hua.';
-  else if (s.state === 'no_extension') body.innerHTML =
-    '“MA CRM WhatsApp” extension is browser mein install nahi (ya CRM tab purana hai). Ek dafa:' +
-    '<ol><li>Address bar mein <code>chrome://extensions</code> kholein (Edge: <code>edge://extensions</code>)</li>' +
-    '<li><b>Developer mode</b> ON karein</li><li><b>Load unpacked</b> → CRM folder ka <code>whatsapp-extension</code> folder select karein</li>' +
-    '<li>CRM tab aur WhatsApp Web tab dono refresh karein (F5)</li></ol>' + how;
-  else if (s.state === 'no_tab') body.innerHTML = '✓ Extension mil gaya. WhatsApp Web tab abhi khula nahi — <code>web.whatsapp.com</code> isi browser mein kholein (ya pehle se khula hai to use refresh karein). Order bhejte waqt extension khud bhi tab khol dega.' + how;
-  else if (s.state === 'not_logged_in') body.innerHTML = 'WhatsApp Web tab mila, lekin login nahi. Usi tab mein WhatsApp Web login karein.' + how;
-  else body.innerHTML = '✓ Connected: is browser ka WhatsApp Web tab CRM ke orders bhejne ke liye tayyar hai.<br>“Send test message” se check karein.' + how;
-  waConnectTimer = setTimeout(() => waConnectTick(false), 2000);
-}
-async function waSendTest(btn) {
-  btn.disabled = true;
-  try {
-    const phone = prompt('Test message kis number par bhejein? (apna doosra number, ya koi bhi apna contact)', '03');
-    if (!phone) { btn.disabled = false; return; }
-    toast('Test bheja ja raha hai — WhatsApp tab dekhein…');
-    const r = await apiFetch('/api/whatsapp/test', { method: 'POST', body: JSON.stringify({ phone }) });
-    if (r && r.success) toast(`✓ Test message bheja: ${r.result.to}`);
-    else { console.warn('[WhatsApp test]', r); toast('Test fail: ' + ((r && r.message) || 'unknown'), false); }
-  } catch (e) { console.error('[WhatsApp test]', e); toast('Server se connect nahi hua', false); }
-  btn.disabled = false;
-}
-
-async function waUnlink() {
-  if (!confirm('Is computer se WhatsApp unlink karein? Dobara QR scan karna hoga.')) return;
-  try { await apiFetch('/api/whatsapp/session/logout', { method: 'POST', body: '{}' }); } catch (e) { console.warn('[CRM]', e); }
-  waConnectTick(false);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -7056,44 +6918,13 @@ function dispCurrentText() {
   return ta ? ta.value : (dispView.info && dispView.info.message) || '';
 }
 
-// Open Chat. A web page cannot see or control other browser tabs, so there are two paths:
-//  1) "MA CRM WhatsApp" extension installed (v1.1+, flagged on <html data-macrm-open-chat>):
-//     the extension finds the WhatsApp Web tab that is ALREADY open in this browser and navigates
-//     that same tab to the customer's chat (login session kept, no new tab). Only if no WhatsApp
-//     tab exists does it open one.
-//  2) No extension: window.open(url, 'macrm_whatsapp') — a single NAMED tab that is reused on every
-//     later click. The browser cannot hand us a WhatsApp tab the user opened by hand, so the first
-//     click may open one tab; after that the same tab is reused.
-// Must stay synchronous up to the first window.open: browsers only allow a new tab inside the click.
+// Must stay synchronous: browsers only allow a new tab directly inside the click.
 function dispOpenChat() {
   const d = dispView.info;
   if (!d || !d.ready || !d.phone) { toast('Pehle upar wali ghalti theek karein', false); return; }
   const text = dispCurrentText().trim();
   if (!text) { toast('Message khali hai', false); return; }
   const url = dispChatUrl(d.phone.number, text);
-  const extOk = !DISP_MOBILE && document.documentElement.dataset.macrmOpenChat === '1';
-  if (!extOk) { dispOpenViaWindow(url, d); return; }
-  const id = 'oc' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-  let settled = false;
-  const finish = r => {
-    if (settled) return; settled = true;
-    window.removeEventListener('message', onMsg); clearTimeout(timer);
-    if (r && r.ok) {
-      const box = document.getElementById('dispBlocked');
-      if (box) box.innerHTML = `<div class="disp-hint" style="margin-top:8px">${r.mode === 'reused' ? '✓ Aap ka khula hua WhatsApp Web tab istemal hua — naya tab nahi khula.' : 'WhatsApp Web khula nahi tha — naya tab khola gaya.'} Chat mein message pehle se likha hoga.</div>`;
-      dispMarkOpened();
-    } else {
-      console.warn('[dispatch] extension could not open the chat — falling back to a named tab:', r && r.error);
-      dispOpenViaWindow(url, d);                       // still within the click's activation window
-    }
-  };
-  const onMsg = ev => { const m = ev.data; if (ev.source === window && m && m.macrm === 'open-chat-res' && m.id === id) finish(m); };
-  const timer = setTimeout(() => finish(null), 1800);
-  window.addEventListener('message', onMsg);
-  window.postMessage({ macrm: 'open-chat-req', id, url }, window.location.origin);
-}
-
-function dispOpenViaWindow(url, d) {
   let w = null;
   try { w = window.open(url, DISP_WINDOW); } catch (e) { console.warn('[dispatch] open:', e); }
   const box = document.getElementById('dispBlocked');
