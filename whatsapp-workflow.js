@@ -18,9 +18,8 @@
 const fs     = require('fs');
 const path   = require('path');
 const phone  = require('./phone');
-const sender = require('./whatsapp-sender');
 
-const STEPS = ['message', 'phone', 'open', 'chat', 'attach', 'send'];
+const STEPS = ['message', 'phone'];
 const ACTIVE = ['pending', 'processing', 'opening'];   // 'opening' = older CRM versions
 
 module.exports = function createWorkflow({ dbRun, dbGet, dbAll, screenshotRoot, gemini, ensureFile }) {
@@ -267,37 +266,15 @@ module.exports = function createWorkflow({ dbRun, dbGet, dbAll, screenshotRoot, 
       if (!ph.ok) return fail(id, 'phone', 'bad_phone', ph.reason);
       await setProgress(id, 'phone', 'done');
 
-      // 3) Claim the send. Only ONE request can move pending → opening.
-      const claim = await dbRun(
-        `UPDATE orders SET wa_status='processing', workflow_state='WHATSAPP_OPENED' WHERE id=? AND wa_status='pending'`, [id]);
-      if (claim.changes !== 1) return;
-
-      const shots = await dbAll(`SELECT * FROM order_screenshots WHERE order_id=? ORDER BY position ASC`, [id]);
-      // Screenshot files can be gone after a redeploy — restore them from permanent storage first.
-      if (ensureFile) for (const s of shots) await ensureFile(s.file_name).catch(e => console.warn(`[WhatsApp] order #${id} screenshot restore:`, e.message));
-      const files = shots.map(s => ({
-        path: path.join(screenshotRoot, s.file_name), mime: s.mime, sha256: s.sha256,
-        name: s.original_name || path.basename(s.file_name),
-      }));
-
-      try {
-        await sender.sendOrder({
-          number: ph.number, files, caption: message,
-          startAt: o.wa_parts_sent || 0,
-          onStep: (step, state) => setProgress(id, step, state),
-          onPartSent: i => dbRun(`UPDATE orders SET wa_parts_sent=? WHERE id=?`, [i + 1, id]),
-        });
-      } catch (e) {
-        return fail(id, e.step || 'open', e.code || 'error', e.message);
-      }
-
-      await dbRun(
-        `UPDATE orders SET wa_status='sent', workflow_state='WHATSAPP_SENT', wa_sent_at=CURRENT_TIMESTAMP,
-           wa_step='send', wa_error=NULL, wa_error_code=NULL WHERE id=?`, [id]);
-      console.log(`[WhatsApp] ✅ order #${id} sent to +${ph.number} (${files.length} screenshot${files.length === 1 ? '' : 's'})`);
+      // 3) Done. Nothing is sent from here any more (no browser / extension automation): the message is
+      //    generated and the number checked, and the order stays as "not dispatched". Sending is the manual
+      //    📤 Dispatch function. wa_status goes back to NULL so the order row shows no WhatsApp badge.
+      await dbRun(`UPDATE orders SET wa_status=NULL, workflow_state='ORDER_PLACED', wa_step='phone', wa_error=NULL, wa_error_code=NULL
+                   WHERE id=? AND wa_status='pending'`, [id]);
+      console.log(`[WhatsApp] order #${id}: message generated, number checked (+${ph.number}) — use Dispatch to send`);
     } catch (e) {
       console.error(`[WhatsApp] order #${id} unexpected error:`, e && e.stack || e);
-      await fail(id, 'open', 'error', e.message).catch(x => console.error(`[WhatsApp] order #${id} could not record failure:`, x.message));
+      await fail(id, 'phone', 'error', e.message).catch(x => console.error(`[WhatsApp] order #${id} could not record failure:`, x.message));
     } finally {
       running.delete(id);
     }
@@ -381,7 +358,7 @@ module.exports = function createWorkflow({ dbRun, dbGet, dbAll, screenshotRoot, 
       message: o.wa_message, message_source: o.wa_message_source,
       phone: ph && ph.ok ? ph.display : o.wa_phone, parts_sent: o.wa_parts_sent || 0,
       screenshots: shots ? shots.n : 0, sent_at: o.wa_sent_at, attempts: o.wa_attempts || 0,
-      running: running.has(o.id), session: sender.status(),
+      running: running.has(o.id),
     };
   }
 
