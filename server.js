@@ -156,7 +156,12 @@ app.get('/report', (req, res) => {
   }
 });
 
-app.use(express.static(path.join(__dirname, 'public'), STATIC_CACHE));
+// HTML pages must ALWAYS be revalidated: with the 1-day cache a browser kept showing the OLD CRM page
+// after a deploy. (ETag still makes an unchanged page cost almost nothing.) Other static files keep the cache.
+app.use(express.static(path.join(__dirname, 'public'), {
+  ...STATIC_CACHE,
+  setHeaders: (res, file) => { if (/\.html?$/i.test(file)) res.setHeader('Cache-Control', 'no-cache'); },
+}));
 
 // ── DATABASE SETUP ──────────────────────────────────────────
 // DATABASE_URL set → Supabase Postgres (permanent). Not set → local SQLite file.
@@ -1672,6 +1677,7 @@ app.use((err, req, res, next) => {
 app.get('*', (req, res) => {
   const indexPath = path.join(__dirname, 'public', 'index.html');
   if (fs.existsSync(indexPath)) {
+    res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(indexPath);
   } else {
     res.json({ error: 'index.html nahi mila. public/ folder mein rakho.' });
