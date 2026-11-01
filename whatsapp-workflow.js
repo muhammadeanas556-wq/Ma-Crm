@@ -58,12 +58,29 @@ module.exports = function createWorkflow({ dbRun, dbGet, dbAll, screenshotRoot, 
     'Hello [Customer Name],', '',
     'Your order [Order ID] has been dispatched successfully.', '',
     'Tracking ID: [Tracking ID]', 'Order: [Order Details]', 'Total: Rs. [Amount]', '',
-    'Your order will be delivered to you within 1–2 working days.', '',
+    'Your order will be delivered to you within 2–3 working days.', '',
     'Thank you for shopping with us.',
   ].join('\n');
 
+  // Delivery estimate is 2–3 working days. An existing whatsapp-message.txt (created by an older
+  // version of the CRM) may still say "1–2 working days" / "One to two days": update just that phrase,
+  // once, and save the file so what is stored matches what is sent. Nothing else in the file changes.
+  function updateDeliveryEstimate(text) {
+    return String(text)
+      .replace(/\b1\s*(?:–|-|—|to)\s*2(\s+(?:working\s+|business\s+)?days?\b)/gi, '2–3$1')
+      .replace(/\bone\s+to\s+two(\s+(?:working\s+|business\s+)?days?\b)/gi, m => (/^O/.test(m) ? 'Two to three' : 'two to three') + m.replace(/^one\s+to\s+two/i, ''));
+  }
+
   function readTemplate() {
-    try { return fs.readFileSync(TEMPLATE_FILE, 'utf8'); }
+    try {
+      const raw = fs.readFileSync(TEMPLATE_FILE, 'utf8');
+      const fixed = updateDeliveryEstimate(raw);
+      if (fixed !== raw) {
+        try { fs.writeFileSync(TEMPLATE_FILE, fixed); console.log('[WhatsApp] whatsapp-message.txt: delivery estimate updated to 2–3 working days'); }
+        catch (we) { console.warn('[WhatsApp] could not save the updated delivery estimate to whatsapp-message.txt:', we.message); }
+      }
+      return fixed;
+    }
     catch (e) {
       if (e.code !== 'ENOENT') throw Object.assign(new Error('whatsapp-message.txt parh nahi saka: ' + e.message), { code: 'template' });
       fs.writeFileSync(TEMPLATE_FILE, DEFAULT_TEMPLATE + '\n');

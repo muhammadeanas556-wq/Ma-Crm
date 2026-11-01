@@ -1361,6 +1361,10 @@ body {
 .ai-f .ai-invalid, .ai-line .ai-invalid { border-color:var(--red) !important; box-shadow:0 0 0 2px rgba(239,68,68,.2); }
 .ai-meta { font-size:11px; color:var(--muted); font-family:var(--mono); line-height:1.5; word-break:break-word; }
 .ai-meta.ai-meta-warn { color:#f7c56b; }
+.ai-missing-note { border-radius:var(--r-md); padding:9px 12px; font-size:12.5px; line-height:1.55; margin-bottom:10px; border:1px solid rgba(245,158,11,.35); background:var(--yellow-dim); color:#f7c56b; font-weight:600; }
+.ai-refine { display:flex; align-items:center; gap:10px; border-radius:var(--r-md); padding:8px 12px; font-size:12px; margin-bottom:10px; border:1px solid var(--border); background:var(--bg3); color:var(--muted); }
+.ai-refine i { width:14px; height:14px; border-radius:50%; border:2px solid var(--bg4); border-top-color:var(--accent2); animation:aiSpin .8s linear infinite; flex:none; }
+.ai-f .ai-missing, .ai-line .ai-missing, .fg .ai-missing { border-color:rgba(245,158,11,.7) !important; box-shadow:0 0 0 2px rgba(245,158,11,.15); }
 .ai-pick { display:flex; gap:6px; flex-wrap:wrap; margin-top:2px; }
 .ai-pick button { background:var(--bg3); border:1px solid rgba(239,68,68,.35); color:var(--text); border-radius:var(--r-sm); padding:4px 9px; font-size:12px; font-family:var(--font); cursor:pointer; }
 .ai-pick button:hover { background:var(--bg4); border-color:rgba(239,68,68,.6); }
@@ -2719,7 +2723,7 @@ body:not(.is-staff) .staff-only { display: none !important; }
 
     <!-- STEP 3: ERROR -->
     <div id="aiStepError" class="ai-error" style="display:none" role="alert">
-      <div class="ai-error-title">Unable to extract order information. Please review the information manually.</div>
+      <div class="ai-error-title">Extraction could not be started. You can still enter the details manually.</div>
       <div class="ai-thumbs" id="aiErrorThumbs"></div>
       <div class="ai-error-reason" id="aiErrorReason"></div>
       <div class="ai-error-hint" id="aiErrorHint"></div>
@@ -5702,7 +5706,7 @@ const AI_MAX_PIXELS  = 3000000;              // larger screenshots are scaled do
 const AI_MAX_FILE    = 20 * 1024 * 1024;
 const AI_MAX_PAYLOAD = 9 * 1024 * 1024;      // server JSON limit is 10 MB
 
-let aiState = { images: [], draft: null, busy: false, saving: false, abort: null, step: 'upload', dirty: false, status: null };
+let aiState = { images: [], draft: null, busy: false, refining: false, jobId: null, saving: false, abort: null, step: 'upload', dirty: false, status: null };
 
 const aiById = id => document.getElementById(id);
 const aiVal  = f => (f && f.value !== null && f.value !== undefined) ? f.value : '';
@@ -5722,16 +5726,16 @@ function aiCloseModal() { aiById('aiImportModal').classList.remove('open'); }
 function aiRequestClose() {
   if (aiState.saving) return;
   if (aiState.step === 'progress') { aiCloseModal(); aiReset(); return; }   // order is saved; WhatsApp keeps going on the server
-  if (aiState.busy) aiCancelExtract();
   if (aiState.step === 'review' && aiState.draft &&
       !confirm('AI extracted details discard karein? Abhi tak kuch bhi save nahi hua.')) return;
+  aiCancelExtract({ silent: true });   // X = really cancel: abort RapidOCR + Gemini requests, mark the job cancelled
   aiCloseModal();
   aiReset();
 }
 
 function aiReset() {
-  if (aiState.abort) { try { aiState.abort.abort(); } catch (e) { console.warn('[CRM]', e); } }
-  aiState = { images: [], draft: null, busy: false, saving: false, abort: null, step: 'upload', dirty: false, status: aiState.status };
+  aiCancelExtract({ silent: true });   // closing / resetting must never leave a job running in the background
+  aiState = { images: [], draft: null, busy: false, refining: false, jobId: null, saving: false, abort: null, step: 'upload', dirty: false, status: aiState.status };
   aiById('aiStepReview').innerHTML = '';
   aiById('aiStepProgress').innerHTML = '';
   waView.orderId = null;
@@ -5749,6 +5753,7 @@ function aiEnterManually() {
 }
 
 function aiUploadAnother() {
+  aiCancelExtract({ silent: true });
   aiState.images = [];
   aiState.draft = null;
   aiRenderPreviews();
@@ -5918,7 +5923,8 @@ function aiEnsureOriginals() { return ensureOriginalsUploaded(aiState.images, ai
 async function aiHandleFiles(fileList, replace) {
   const files = Array.from(fileList || []);
   ['aiFileInput', 'aiFileReplace'].forEach(id => { const el = aiById(id); if (el) el.value = ''; });
-  if (!files.length || aiState.busy) return;
+  if (!files.length) return;
+  if (aiState.busy || aiState.refining) aiCancelExtract({ silent: true });   // a new screenshot always starts a fresh job
   if (replace) aiState.images = [];
   const errors = [];
   for (const file of files) {
@@ -5972,43 +5978,202 @@ function aiRenderPreviews() {
 }
 
 function aiZoom(i) { const im = aiState.images[i]; if (im) openSsLightbox(im.dataUrl); }
-function aiRemoveImage(i) { if (aiState.busy) return; aiState.images.splice(i, 1); aiRenderPreviews(); }
-function aiRemoveAll() { if (aiState.busy) return; aiState.images = []; aiRenderPreviews(); }
+function aiRemoveImage(i) { aiCancelExtract({ silent: true }); aiState.images.splice(i, 1); aiRenderPreviews(); }   // X on a screenshot also cancels its extraction
+function aiRemoveAll() { aiCancelExtract({ silent: true }); aiState.images = []; aiRenderPreviews(); }
 
 // ── EXTRACT ─────────────────────────────────────────────────
+// Flow: POST /api/ai/extract starts a JOB (RapidOCR first, then Gemini on the server) and answers at once.
+// We poll the job: as soon as RapidOCR has produced something, the review form opens with it; when
+// Gemini finishes, its verified result is merged in (never over fields the user already edited).
+// Every request uses one AbortController, and the X / Cancel / replace paths also tell the server
+// to cancel the job. Responses that belong to an old job id are ignored.
+const AI_POLL_MS = 600;
+const AI_CLIENT_LIMIT_MS = 68000;   // server hard limit is 60 s; this is only a safety net
+
+function aiNewJobId() {
+  try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID().replace(/-/g, ''); } catch (e) { /* fall through */ }
+  return 'j' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+}
+const aiSleepAbortable = (ms, signal) => new Promise(r => { const t = setTimeout(r, ms); if (signal) signal.addEventListener('abort', () => { clearTimeout(t); r(); }, { once: true }); });
+
 async function aiExtract() {
-  if (aiState.busy) return;                          // blocks duplicate requests
+  if (aiState.busy || aiState.refining) return;      // blocks duplicate requests
   if (role !== 'admin' && role !== 'staff') { toast('Access denied', false); return; }
   if (!aiState.images.length) { aiShowStep('upload'); toast('Pehle screenshot upload karein', false); return; }
+  const jobId = aiNewJobId();
   const payload = JSON.stringify({
+    jobId,
     images: aiState.images.map(im => ({ data: im.dataUrl, name: im.name })),
   });
   if (payload.length > AI_MAX_PAYLOAD) { aiShowError('Screenshots mila kar bohat bare hain.', 'too_large'); return; }
 
   aiState.busy = true;
+  aiState.draft = null;
+  aiState.dirty = false;
+  aiState.jobId = jobId;
   const ctrl = new AbortController();
   aiState.abort = ctrl;
+  const current = () => aiState.jobId === jobId && aiState.abort === ctrl && !ctrl.signal.aborted;   // false once cancelled / replaced
   aiById('aiLoadingSub').textContent = aiState.images.length === 1
     ? '1 screenshot parha ja raha hai'
     : `${aiState.images.length} screenshots parhe ja rahe hain`;
   aiShowStep('loading');
   aiUpdateUploadButtons();
   try {
-    const res = await apiFetch('/api/ai/extract', { method: 'POST', body: payload, signal: ctrl.signal });
-    if (ctrl.signal.aborted) return;
-    if (!res || !res.success || !res.draft) { aiShowError(res && res.message, res && res.code, res && res.detail); return; }
-    aiState.draft = res.draft;
-    aiState.dirty = false;
-    aiRenderReview(res.draft);
-    aiShowStep('review');
-    aiById('aiImportModal').querySelector('.ai-modal').scrollTop = 0;
+    const start = await apiFetch('/api/ai/extract', { method: 'POST', body: payload, signal: ctrl.signal });
+    if (!current()) return;
+    if (!start || !start.success) {
+      if (['too_large', 'bad_image', 'rate_limited', 'busy'].includes(start && start.code)) { aiShowError(start.message, start.code, start.detail); return; }
+      aiOpenManualAfterExtract({ message: (start && start.message) || 'Extraction could not be started.' });
+      return;
+    }
+    await aiPollJob(jobId, ctrl, current);
   } catch (e) {
-    if (e && e.name === 'AbortError') return;
-    aiShowError('CRM server se connect nahi ho saka.', 'server_down');
+    if ((e && e.name === 'AbortError') || !current()) return;
+    aiOpenManualAfterExtract({ message: 'CRM server se connect nahi ho saka.' });
   } finally {
-    if (aiState.abort === ctrl) { aiState.busy = false; aiState.abort = null; }
+    if (aiState.abort === ctrl) { aiState.busy = false; aiState.refining = false; aiState.abort = null; }
     aiUpdateUploadButtons();
   }
+}
+
+const aiHasAny = d => !!d && d.stats && d.stats.five ? d.stats.five.filled > 0 : !!(d && d.stats && d.stats.filled > 0);
+
+async function aiPollJob(jobId, ctrl, current) {
+  const t0 = Date.now();
+  let rev, fails = 0, shown = false;
+  while (current()) {
+    let r = null;
+    try {
+      r = await apiFetch(`/api/ai/extract/${encodeURIComponent(jobId)}` + (rev !== undefined ? `?rev=${rev}` : ''), { signal: ctrl.signal });
+      fails = 0;
+    } catch (e) {
+      if (!current()) return;
+      fails++;
+    }
+    if (!current()) return;                                  // user cancelled / new job: drop this response
+    if (r && r.success && r.job) {
+      const j = r.job;
+      if (j.rev !== undefined) rev = j.rev;
+      if (j.state === 'cancelled') return;
+      const draft = j.draft;
+      if (draft && aiHasAny(draft)) {
+        if (!shown) {                                        // first usable result (RapidOCR, ~4 s) → show it NOW
+          shown = true;
+          aiState.draft = draft;
+          aiState.refining = !j.final;
+          aiState.busy = false;                              // the form is usable; Gemini keeps refining in the background
+          aiRenderReview(draft);
+          aiShowStep('review');
+          aiById('aiImportModal').querySelector('.ai-modal').scrollTop = 0;
+          aiUpdateUploadButtons();
+          if (!j.final) aiSetRefine(true);
+        } else if (j.final) {
+          aiApplyFinal(draft);
+        } else {
+          aiFillEmpty(draft);                                // another screenshot finished: only fill blanks
+        }
+      }
+      if (!j.final && !shown) {
+        aiById('aiLoadingSub').textContent = j.stage === 'gemini' ? 'RapidOCR ho gaya — Gemini check kar raha hai' : 'RapidOCR screenshot parh raha hai';
+      }
+      if (j.final) {
+        aiSetRefine(false);
+        if (!shown) aiOpenManualAfterExtract({ draft, notes: j.notes, error: j.error, timedOut: j.timedOut });
+        else if (draft && draft.stats && draft.stats.five && draft.stats.five.missing.length) aiUpdateMissingNote();
+        return;
+      }
+    } else if (r && r.code === 'not_found') {
+      aiOpenManualAfterExtract({ message: 'Extraction result expire ho gaya.' });
+      return;
+    } else if (fails >= 5) {
+      aiOpenManualAfterExtract({ message: 'CRM server se connect nahi ho saka.' });
+      return;
+    }
+    if (Date.now() - t0 > AI_CLIENT_LIMIT_MS) {              // safety net only; the server stops at 60 s
+      if (!shown) aiOpenManualAfterExtract({ message: 'Extraction time limit tak pohnch gaya.' });
+      return;
+    }
+    await aiSleepAbortable(AI_POLL_MS, ctrl.signal);
+  }
+}
+
+// Nothing usable was read (or the extraction failed): open the normal form EMPTY. Incomplete
+// extraction never blocks placing an order.
+function aiOpenManualAfterExtract({ draft, notes, error, timedOut, message } = {}) {
+  aiState.draft = draft || { client: {}, order: {}, warnings: [], stats: { filled: 0 } };
+  aiState.dirty = false;
+  aiState.refining = false;
+  aiRenderReview(aiState.draft);
+  aiShowStep('review');
+  const why = message || (error && error.message) || (notes && ((notes.gemini && /failed|timeout|not configured/.test(notes.gemini) ? 'Gemini: ' + notes.gemini : '') || (notes.rapidocr && /failed/.test(notes.rapidocr) ? 'RapidOCR: ' + notes.rapidocr : ''))) || '';
+  const box = aiById('aiMissingNote');
+  if (box && why) box.insertAdjacentHTML('afterend', `<div class="ai-meta" style="margin:-4px 0 10px">${esc(why)}${timedOut ? ' (60s limit)' : ''} <button type="button" class="ai-textlink" style="display:inline;margin-left:6px" onclick="aiRetryFromReview()">Retry extraction</button></div>`);
+  aiById('aiImportModal').querySelector('.ai-modal').scrollTop = 0;
+  const n = aiById('ai-name'); if (n && !n.value) n.focus();
+}
+function aiRetryFromReview() {
+  if (aiState.dirty && !confirm('Aap ne form edit kiya hai — dobara extract karne se edits mit jayen gi. Jaari rakhein?')) return;
+  aiState.draft = null; aiState.dirty = false;
+  aiShowStep('upload');
+  aiExtract();
+}
+
+function aiSetRefine(on) {
+  const el = aiById('aiRefineStrip');
+  if (el) el.style.display = on ? '' : 'none';
+}
+
+// Fill only fields that are still empty (the user may already be typing). Used for partial updates.
+function aiFillEmpty(d) {
+  const c = d.client || {}, o = d.order || {};
+  const set = (id, v) => { const el = aiById(id); if (el && !el.value.trim() && v !== null && v !== undefined && v !== '') { el.value = v; el.classList.remove('ai-missing'); return true; } return false; };
+  set('ai-name', aiVal(c.name)); set('ai-address', aiVal(c.address)); set('ai-tracking', aiVal(o.tracking_id)); set('ai-amount', aiVal(o.cod_amount));
+  const first = document.querySelector('#ai-phones .ai-phone-input');
+  if (first && !first.value.trim() && c.phones && c.phones[0]) first.value = c.phones[0].value;
+  const lines = aiDraftLines(o);
+  const sel = document.querySelector('#ai-lines .ai-line-product');
+  if (sel && !sel.value && lines.length) {
+    const l = lines[0];
+    if (l.product) sel.value = l.product;
+    else { sel.value = CUSTOM_PRODUCT_VALUE; sel.dispatchEvent(new Event('change', { bubbles: true })); const ni = document.querySelector('#ai-lines .ai-line-custom-name'); if (ni && !ni.value) ni.value = l.custom; }
+  }
+  aiState.draft = d;
+  aiUpdateWaLine(); aiUpdateRemaining(); aiUpdateMissingNote();
+}
+
+// Gemini finished: untouched form → re-render with the verified result; otherwise just fill blanks.
+function aiApplyFinal(d) {
+  if (!aiState.dirty) {
+    const scroller = aiById('aiImportModal').querySelector('.ai-modal');
+    const top = scroller.scrollTop;
+    aiState.draft = d;
+    aiRenderReview(d);
+    scroller.scrollTop = top;
+  } else {
+    aiFillEmpty(d);
+  }
+}
+
+// "Some information could not be extracted…" — shown while any of the five fields is empty;
+// disappears by itself once the user has completed them.
+function aiMissingFields() {
+  const empty = id => { const el = aiById(id); return !el || !el.value.trim(); };
+  const phone = [...document.querySelectorAll('#ai-phones .ai-phone-input')].every(el => !el.value.trim());
+  const sel = document.querySelector('#ai-lines .ai-line-product');
+  const customName = document.querySelector('#ai-lines .ai-line-custom-name');
+  const product = !sel || !sel.value || (sel.value === CUSTOM_PRODUCT_VALUE && !(customName && customName.value.trim()));
+  return { 'ai-name': empty('ai-name'), 'ai-phone': phone, 'ai-amount': empty('ai-amount'), 'ai-product': product, 'ai-tracking': empty('ai-tracking') };
+}
+function aiUpdateMissingNote() {
+  const box = aiById('aiMissingNote');
+  if (!box) return;
+  const m = aiMissingFields();
+  box.style.display = Object.values(m).some(Boolean) ? '' : 'none';
+  const mark = (el, on) => { if (el) el.classList.toggle('ai-missing', on); };
+  mark(aiById('ai-name'), m['ai-name']); mark(aiById('ai-amount'), m['ai-amount']); mark(aiById('ai-tracking'), m['ai-tracking']);
+  mark(document.querySelector('#ai-phones .ai-phone-input'), m['ai-phone']);
+  mark(document.querySelector('#ai-lines .ai-line-product'), m['ai-product']);
 }
 
 function aiReviewManually() {
@@ -6021,11 +6186,28 @@ function aiReviewManually() {
   const n = aiById('ai-name'); if (n) n.focus();
 }
 
-function aiCancelExtract() {
+// Tell the server to cancel (fire-and-forget; keepalive so it still goes out while the modal closes)
+function aiSendCancel(jobId) {
+  if (!jobId || (typeof role !== 'undefined' && role === 'demo')) return;
+  try {
+    fetch(API + `/api/ai/extract/${encodeURIComponent(jobId)}/cancel`, {
+      method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: '{}', keepalive: true,
+    }).catch(e => console.warn('[AI import] cancel request:', e));
+  } catch (e) { console.warn('[AI import] cancel request:', e); }
+}
+
+// Cancels the active extraction everywhere: browser requests (AbortController), the job on the server
+// (which aborts RapidOCR + Gemini), and the UI state. After this, no late response can change the UI.
+function aiCancelExtract(opts) {
+  const jobId = aiState.jobId;
   if (aiState.abort) { try { aiState.abort.abort(); } catch (e) { console.warn('[CRM]', e); } }
+  if (jobId && (aiState.busy || aiState.refining || aiState.abort)) aiSendCancel(jobId);
+  aiState.jobId = null;          // any response still in flight now belongs to an old job and is ignored
   aiState.busy = false;
+  aiState.refining = false;
   aiState.abort = null;
-  aiShowStep('upload');
+  aiSetRefine(false);
+  if (!opts || !opts.silent) aiShowStep('upload');
   aiUpdateUploadButtons();
 }
 
@@ -6256,7 +6438,6 @@ function aiRenderReview(draft) {
   const c = draft.client || {}, o = draft.order || {};
   const aiLines = aiDraftLines(o);
   const stats = draft.stats || {};
-  const service = aiEnsureDefaultService();
   const check = [c.name, c.address, o.tracking_id, o.cod_amount]
     .filter(f => f && (f.conflict || (f.value !== null && f.confidence && f.confidence !== 'high'))).length
     + (c.phones || []).filter(p => p.confidence !== 'high').length;
@@ -6273,7 +6454,9 @@ function aiRenderReview(draft) {
 
   aiById('aiStepReview').innerHTML = `
     <div class="ai-review-title">AI Extracted Details</div>
-    <div class="ai-review-sub">${stats.filled || 0} fields screenshot se bhare gaye${check ? `, ${check} ko check karein (highlighted)` : ''}. Jo parha nahi gaya woh khali hai — khud bhar dein. Abhi kuch save nahi hua.</div>
+    <div class="ai-review-sub">${stats.five ? stats.five.filled + ' / 5' : (stats.filled || 0)} fields screenshot se bhare gaye${check ? `, ${check} ko check karein (highlighted)` : ''}. Jo parha nahi gaya woh khali hai — khud bhar dein. Abhi kuch save nahi hua.</div>
+    <div class="ai-refine" id="aiRefineStrip" style="display:none" aria-live="polite"><i aria-hidden="true"></i><span>Gemini screenshot se verify kar raha hai — fields update ho saktay hain. Aap abhi bhi edit ya Place Order kar saktay hain.</span></div>
+    <div class="ai-missing-note" id="aiMissingNote" role="status" style="display:none">Some information could not be extracted. Please check and complete the missing fields manually.</div>
     <div class="ai-thumbs">${thumbs}</div>
     ${warnings}
 
@@ -6296,8 +6479,8 @@ function aiRenderReview(draft) {
           input: `<input type="number" id="ai-amount" min="0" step="any" placeholder="e.g. 2800" value="${esc(aiVal(o.cod_amount))}"/>`,
           extra: '<div class="ai-meta">Order amount ke taur par save hoga</div>' })}
         <div class="fg full">
-          <label>Product + Quantity ${aiLines.length ? '<span class="ai-chip ai-chip-medium">From screenshot — check</span>' : `<span class="ai-default-tag">Default: ${esc(service)}</span>`}</label>
-          <div id="ai-lines">${aiLines.length ? aiLines.map(aiLineHtml).join('') : aiLineHtml({ product: service, qty: 1 })}</div>
+          <label>Product + Quantity ${aiLines.length ? '<span class="ai-chip ai-chip-medium">From screenshot — check</span>' : '<span class="ai-default-tag">Not found — select</span>'}</label>
+          <div id="ai-lines">${aiLines.length ? aiLines.map(aiLineHtml).join('') : aiLineHtml({ product: '', qty: 1 })}</div>
           <button type="button" class="ai-add-inline" onclick="aiAddLine()">＋ Add Product</button>
         </div>
       </div>
@@ -6347,6 +6530,7 @@ function aiRenderReview(draft) {
   aiUpdateRemaining();
   aiUpdateWaLine();
   aiRefreshWaSession();
+  aiUpdateMissingNote();
 }
 
 function aiUpdateRemaining() {
@@ -6375,9 +6559,11 @@ function aiUpdateRemaining() {
     markEdited(e.target);
     if (e.target.id === 'ai-amount' || e.target.id === 'ai-advance') aiUpdateRemaining();
     if (e.target.classList.contains('ai-phone-input')) aiUpdateWaLine();
+    aiUpdateMissingNote();
   });
   root.addEventListener('change', e => {
     markEdited(e.target);
+    setTimeout(aiUpdateMissingNote, 0);
     if (e.target.classList.contains('ai-line-product')) {
       const line = e.target.closest('.ai-line');
       const custom = line.querySelector('.ai-line-custom');
@@ -6503,13 +6689,15 @@ async function aiSave() {
     const originals = await aiEnsureOriginals();
     if (!originals.ok) { toast(originals.message, false); return; }
     body.whatsapp = { phone: waPick.source, screenshot_ids: originals.ids };
+    if (aiState.jobId) body.extraction_job_id = aiState.jobId;   // server refuses it if that extraction was cancelled
 
     if (btn) btn.textContent = 'Placing order…';
     const res = await apiFetch('/api/clients/save', { method: 'POST', body: JSON.stringify(body) });
     if (!res || !res.success) {
-      toast(res && res.code === 'validation' ? res.message : 'Order could not be saved. WhatsApp was not opened.', false);
+      toast(res && (res.code === 'validation' || res.code === 'extraction_cancelled') ? res.message : 'Order could not be saved. WhatsApp was not opened.', false);
       return;
     }
+    aiCancelExtract({ silent: true });   // order is saved: stop any Gemini refinement still running
     aiAfterSave(res);
   } catch (e) {
     toast('Order could not be saved. WhatsApp was not opened. (Server se connect nahi hua)', false);
@@ -6667,8 +6855,8 @@ function waRenderProgress(st) {
     if (['no_extension', 'no_tab', 'not_linked', 'not_ready', 'timeout', 'not_installed'].includes(st.error_code)) buttons += `<button type="button" class="btn btn-outline" onclick="waOpenConnect()">Connect WhatsApp</button>`;
     if (WA_ASK_FIRST.includes(st.error_code)) buttons += `<button type="button" class="btn btn-outline" onclick="waMarkSent(${id}, this)">Already sent</button>`;
   }
-  // Method 1 — available as soon as the order is saved, whatever the automatic sender is doing.
-  buttons += `<button type="button" class="btn btn-blue" onclick="openDispatch(${id})" title="WhatsApp chat khol kar dispatch message tayyar karein">📤 Send Dispatch Message</button>`;
+  // (The "Send Dispatch Message" button used to repeat here. Dispatch is still one click away from the
+  //  📤 Dispatch chip on the order row and from Edit Order, so this panel stays WhatsApp-only.)
   buttons += `<button type="button" class="btn btn-outline wa-close" onclick="aiRequestClose()">Close</button>`;
 
   aiById('aiStepProgress').innerHTML = `
@@ -6868,13 +7056,44 @@ function dispCurrentText() {
   return ta ? ta.value : (dispView.info && dispView.info.message) || '';
 }
 
-// Must stay synchronous: browsers only allow a new tab directly inside the click.
+// Open Chat. A web page cannot see or control other browser tabs, so there are two paths:
+//  1) "MA CRM WhatsApp" extension installed (v1.1+, flagged on <html data-macrm-open-chat>):
+//     the extension finds the WhatsApp Web tab that is ALREADY open in this browser and navigates
+//     that same tab to the customer's chat (login session kept, no new tab). Only if no WhatsApp
+//     tab exists does it open one.
+//  2) No extension: window.open(url, 'macrm_whatsapp') — a single NAMED tab that is reused on every
+//     later click. The browser cannot hand us a WhatsApp tab the user opened by hand, so the first
+//     click may open one tab; after that the same tab is reused.
+// Must stay synchronous up to the first window.open: browsers only allow a new tab inside the click.
 function dispOpenChat() {
   const d = dispView.info;
   if (!d || !d.ready || !d.phone) { toast('Pehle upar wali ghalti theek karein', false); return; }
   const text = dispCurrentText().trim();
   if (!text) { toast('Message khali hai', false); return; }
   const url = dispChatUrl(d.phone.number, text);
+  const extOk = !DISP_MOBILE && document.documentElement.dataset.macrmOpenChat === '1';
+  if (!extOk) { dispOpenViaWindow(url, d); return; }
+  const id = 'oc' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  let settled = false;
+  const finish = r => {
+    if (settled) return; settled = true;
+    window.removeEventListener('message', onMsg); clearTimeout(timer);
+    if (r && r.ok) {
+      const box = document.getElementById('dispBlocked');
+      if (box) box.innerHTML = `<div class="disp-hint" style="margin-top:8px">${r.mode === 'reused' ? '✓ Aap ka khula hua WhatsApp Web tab istemal hua — naya tab nahi khula.' : 'WhatsApp Web khula nahi tha — naya tab khola gaya.'} Chat mein message pehle se likha hoga.</div>`;
+      dispMarkOpened();
+    } else {
+      console.warn('[dispatch] extension could not open the chat — falling back to a named tab:', r && r.error);
+      dispOpenViaWindow(url, d);                       // still within the click's activation window
+    }
+  };
+  const onMsg = ev => { const m = ev.data; if (ev.source === window && m && m.macrm === 'open-chat-res' && m.id === id) finish(m); };
+  const timer = setTimeout(() => finish(null), 1800);
+  window.addEventListener('message', onMsg);
+  window.postMessage({ macrm: 'open-chat-req', id, url }, window.location.origin);
+}
+
+function dispOpenViaWindow(url, d) {
   let w = null;
   try { w = window.open(url, DISP_WINDOW); } catch (e) { console.warn('[dispatch] open:', e); }
   const box = document.getElementById('dispBlocked');

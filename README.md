@@ -72,3 +72,11 @@ Open Chrome → Extensions → Developer mode → **Load unpacked**, select the 
 - The Staff Management card and the Add/Edit/Delete Staff dialogs are Admin-only in the UI, and their functions refuse to run for staff.
 
 **Database**: 6 new nullable columns on `orders` (`dispatch_status`, `dispatch_phone`, `dispatch_opened_at`, `dispatch_sent_at`, `dispatch_by_user_id`, `dispatch_by_name`), added automatically on start. Nothing existing is changed or deleted.
+
+## Screenshot extraction, cancellation & Dispatch tab reuse (update)
+
+- **Extraction = a cancellable job.** `POST /api/ai/extract` starts it, `GET /api/ai/extract/:id` polls, `POST /api/ai/extract/:id/cancel` cancels. RapidOCR runs first (~4 s, hard cut 6 s); its result is shown at once; Gemini then gets the image + OCR text and the two are merged **field by field** (name, phone, price, product, tracking). Gemini failing never discards RapidOCR's result. Hard limit for the whole job: 60 s. Fields that cannot be read stay **blank**; if the engines disagree and neither value can be verified (Gemini's value is not on the page and neither passes a format check), the field is left blank and a warning is shown. Incomplete extraction never blocks Place Order.
+- **Cancel (X / Cancel / replace screenshot / close):** aborts the browser requests (AbortController), cancels the job on the server (aborting RapidOCR + Gemini calls and retries), and ignores late responses. A new upload cancels the user's previous job. A cancelled job id is refused by `/api/clients/save`.
+- **WhatsApp message** now says *2–3 working days*; an existing `whatsapp-message.txt` with "1–2 / One to two … days" is updated once automatically.
+- **Dispatch → Open Chat** reuses the open WhatsApp Web tab when the extension (v1.1.0+, reload it in `chrome://extensions`) is installed; otherwise it uses one named tab. A web page cannot control tabs it did not open, so without the extension the first click can still open one tab.
+- Tests: `npm test`.

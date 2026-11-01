@@ -57,6 +57,7 @@ const envInfo = { file: null, fromEnvVar: false, notes: [] };
 })();
 const ai = require('./ai-import');
 const rapidocr = require('./rapidocr-provider');
+const { createExtractionService } = require('./extraction-jobs');
 const phoneUtil   = require('./phone');
 const waSender    = require('./whatsapp-sender');
 const createWaFlow = require('./whatsapp-workflow');
@@ -896,9 +897,8 @@ app.get('/api/report/months', async (req, res) => {
 //  /api/ai/extract NEVER writes to the database.
 // ════════════════════════════════════════════════════════════
 
-// Rate limit + one extraction at a time per browser (protects the API key's quota)
+// Rate limit per browser (protects the API key's quota). Only one job per user runs at a time: a new upload cancels the old job.
 const aiHits = new Map();
-const aiInFlight = new Set();
 const AI_WINDOW_MS = 10 * 60 * 1000, AI_MAX_PER_WINDOW = 30;
 function aiRateOk(ip) {
   const now = Date.now();
@@ -943,6 +943,8 @@ app.get('/api/ai/status', (req, res) => {
 // 4 minutes worst case. Partial results beat a complete-but-slow one, so we now fail
 // fast to manual entry instead of hammering the same provider.)
 const AI_RETRY_WAITS_MS = [1500];
+// At most this many providers/models are tried per screenshot (no hammering the quota with repeats).
+const AI_MAX_PROVIDER_ATTEMPTS = Number(process.env.AI_MAX_PROVIDER_ATTEMPTS) || 3;
 function aiIsTransient(e) {
   if (!e) return false;
   if (e.code === 'config' || e.code === 'bad_request' || e.code === 'blocked' || e.code === 'bad_image') return false;
@@ -987,6 +989,7 @@ async function aiCallGeminiWithRetry(opts, log, signal) {
   const tried = [];
   const errs = [];
   for (const [n, entry] of usable.entries()) {
+    if (n >= AI_MAX_PROVIDER_ATTEMPTS) break;
     if (signal && signal.aborted) throw new ai.AiError('aborted', 'Request was cancelled by the browser');
     // First provider gets one quick retry; every other provider in the chain gets none —
     // move straight on to the next key/model rather than waiting on one that's already slow.
@@ -995,7 +998,7 @@ async function aiCallGeminiWithRetry(opts, log, signal) {
       try {
         const out = entry.kind === 'gemini'
           ? await ai.callGemini({ ...opts, apiKey: entry.key, model: entry.model, signal })
-          : await ai.callNvidia({ apiKey: NVIDIA_API_KEY, model: entry.model, baseUrl: NVIDIA_BASE_URL, image: opts.image, index: opts.index, total: opts.total, signal });
+          : await ai.callNvidia({ apiKey: NVIDIA_API_KEY, model: entry.model, baseUrl: NVIDIA_BASE_URL, image: opts.image, index: opts.index, total: opts.total, ocrText: opts.ocrText, signal });
         if (n > 0 || attempt) log(`succeeded on ${entry.label} (attempt ${attempt + 1})`);
         aiCooldown.delete(entry.id);
         return { ...out, provider: entry.label };
@@ -1078,126 +1081,67 @@ function aiKeepOrderFieldsOnly(draft) {
   return draft;
 }
 
-// ── AI: EXTRACT (returns a draft for review — saves nothing) ──
-app.post('/api/ai/extract', async (req, res) => {
-  const ip = req.ip || (req.socket && req.socket.remoteAddress) || 'local';
-  if (!AI_ENABLED) return res.json({ success: false, code: 'config', message: AI_USER_MESSAGES.config });
-  if (aiInFlight.has(ip)) return res.json({ success: false, code: 'busy', message: 'An extraction is already running. Wait for it to finish.' });
-  if (!aiRateOk(ip)) return res.json({ success: false, code: 'rate_limited', message: 'Too many extractions in a short time. Wait a few minutes.' });
+// ── AI: EXTRACT — a cancellable JOB (saves nothing, never creates an order) ──
+//   POST /api/ai/extract            {jobId, images}  → starts the job, answers at once
+//   GET  /api/ai/extract/:id?rev=N                   → progress + (partial → final) draft
+//   POST /api/ai/extract/:id/cancel                  → aborts RapidOCR + Gemini, marks it cancelled
+// RapidOCR runs first (~4 s) and its result is published immediately; Gemini then verifies it
+// against the image. Hard limit for the whole job: 60 s (EXTRACT_HARD_LIMIT_MS).
+const extraction = createExtractionService({
+  ai, rapidocr,
+  geminiAvailable: () => aiBuildChain().length > 0,
+  callGemini: (opts, log, signal) => aiCallGeminiWithRetry({ apiKey: GEMINI_API_KEY, model: GEMINI_MODEL, ...opts }, log, signal),
+  finalizeDraft: aiKeepOrderFieldsOnly,
+  log: msg => console.log(msg),
+});
+const extractOwner = req => String((req.user && req.user.id) || req.ip || 'anon');
 
-  aiInFlight.add(ip);
-  // If the browser disconnects (modal closed, fetch aborted, tab closed), stop
-  // retrying Gemini right away instead of finishing the whole chain in the
-  // background and holding this IP's lock for no one.
-  const reqCtrl = new AbortController();
-  // IMPORTANT: this must be res.on('close'), not req.on('close'). req's 'close'
-  // fires as soon as Express finishes reading the request body (i.e. almost
-  // immediately, long before any response is sent) — it does NOT mean the
-  // browser disconnected. res's 'close' fires when the underlying connection
-  // actually goes away, which is what we want to react to.
-  res.on('close', () => { if (!res.writableEnded) reqCtrl.abort(); });
-  const started = Date.now();
+app.post('/api/ai/extract', async (req, res) => {
   try {
+    if (!AI_ENABLED) return res.json({ success: false, code: 'config', message: AI_USER_MESSAGES.config });
+    const owner = extractOwner(req);
+    const mgr = extraction.manager;
+    const ip = req.ip || (req.socket && req.socket.remoteAddress) || 'local';
+    const reqId = req.body && req.body.jobId;
+    const jobId = reqId === undefined || reqId === null || reqId === '' ? mgr.newId() : reqId;
+    if (!mgr.validId(jobId)) return res.json({ success: false, code: 'bad_image', message: 'Invalid extraction job id.' });
+    if (mgr.wasCancelled(owner, jobId)) return res.json({ success: false, code: 'cancelled', message: 'Extraction was cancelled.' });
+    if (mgr.get(owner, jobId)) return res.json({ success: false, code: 'busy', message: 'This extraction job already exists.' });
+    if (!aiRateOk(ip)) return res.json({ success: false, code: 'rate_limited', message: 'Too many extractions in a short time. Wait a few minutes.' });
+
     const imagesIn = Array.isArray(req.body && req.body.images) ? req.body.images : [];
     if (!imagesIn.length) return res.json({ success: false, code: 'bad_image', message: 'Upload at least one screenshot.' });
     if (imagesIn.length > ai.LIMITS.MAX_IMAGES) return res.json({ success: false, code: 'bad_image', message: `Maximum ${ai.LIMITS.MAX_IMAGES} screenshots per import.` });
-
     let images;
     try { images = imagesIn.map((img, i) => ai.decodeImage(img, i + 1)); }
-    catch (e) {
-      console.warn('[AI import] bad image:', e.message);
-      return res.json({ success: false, code: 'bad_image', message: e.message });
-    }
+    catch (e) { console.warn('[AI import] bad image:', e.message); return res.json({ success: false, code: 'bad_image', message: e.message }); }
 
-    const total = images.length;
-    // Hard wall-clock budget for ONE screenshot's whole read: RapidOCR first, then —
-    // only if time remains — Gemini/NVIDIA. Past this, stop trying and leave the field
-    // blank for manual entry rather than let a slow engine hold up the batch.
-    const AI_PER_IMAGE_BUDGET_MS = 30000;
-    const results = await aiMapLimit(images, 2, async (image, i) => {
-      const tag = `[AI import] screenshot ${i + 1}/${total} (model ${GEMINI_MODEL}, ${image.mime}, ${Math.max(1, Math.round(image.bytes / 1024))} KB)`;
-      const deadline = Date.now() + AI_PER_IMAGE_BUDGET_MS;
+    // A new screenshot always starts a FRESH job: whatever this user still has running is cancelled first.
+    const old = mgr.active(owner);
+    if (old) { console.log(`[extract ${old.id.slice(0, 6)}] superseded by a new upload — cancelling`); mgr.cancel(owner, old.id, 'superseded'); }
 
-      // Shared abort for this one image: fires on the 30s budget OR if the browser
-      // disconnects (reqCtrl) — whichever comes first. RapidOCR and Gemini both see it,
-      // so a slow RapidOCR call doesn't eat into Gemini's share of the 30s, and neither
-      // engine runs a moment longer than the browser is still waiting.
-      const imgCtrl = new AbortController();
-      const budgetTimer = setTimeout(() => imgCtrl.abort(), AI_PER_IMAGE_BUDGET_MS);
-      const onParentAbort = () => imgCtrl.abort();
-      reqCtrl.signal.addEventListener('abort', onParentAbort, { once: true });
-      const cleanup = () => { clearTimeout(budgetTimer); reqCtrl.signal.removeEventListener('abort', onParentAbort); };
-
-      // Priority 1: RapidOCR (local/self-hosted, fast — tried before Gemini). Its own
-      // RAPIDOCR_TIMEOUT_MS (20s) governs a single slow HTTP call; this shared imgCtrl
-      // additionally cuts it off the moment the 30s total budget runs out. Only its OCR
-      // text-recognition stage replaces anything here — the result still goes through
-      // ai.validateParcel(), the CRM's existing field-extraction/mapping/validation
-      // logic, unchanged. On any failure, timeout, or too little read, fall through to
-      // Gemini/NVIDIA (priority 2) below, using whatever's left of the 30s.
-      try {
-        const rOut = await rapidocr.tryRapidOcr(image, { signal: imgCtrl.signal });
-        const data = ai.validateParcel(rOut.data);
-        console.log(`${tag} OK via RapidOCR (${rOut.filled} field(s), ${rOut.timingMs && Math.round(rOut.timingMs.total_ms)}ms OCR)`);
-        cleanup();
-        return { index: i + 1, ok: true, data };
-      } catch (e) {
-        if (reqCtrl.signal.aborted) { cleanup(); throw new ai.AiError('aborted', 'Request was cancelled by the browser'); }
-        console.warn(`${tag} RapidOCR skipped (${e.code || 'error'}: ${e.message}) — falling back to Gemini/NVIDIA`);
-      }
-
-      if (Date.now() >= deadline) {
-        cleanup();
-        console.warn(`${tag} FAILED — 30s budget used up before Gemini could be tried`);
-        return { index: i + 1, ok: false, code: 'timeout', error: 'Screenshot could not be read within 30 seconds', detail: null };
-      }
-
-      try {
-        const out = await aiCallGeminiWithRetry({
-          apiKey: GEMINI_API_KEY, model: GEMINI_MODEL, image, index: i + 1, total,
-          onLog: msg => console.warn(`${tag} ${msg}`),
-        }, msg => console.warn(`${tag} ${msg}`), imgCtrl.signal);
-        const data = ai.validateParcel(out.data);
-        console.log(`${tag} OK via ${out.provider || 'Gemini'} ("${out.variant}" request)`);
-        return { index: i + 1, ok: true, data };
-      } catch (e) {
-        if (reqCtrl.signal.aborted) throw new ai.AiError('aborted', 'Request was cancelled by the browser');
-        const code = imgCtrl.signal.aborted && e.code !== 'config' ? 'timeout' : (e.code || 'upstream');
-        const message = code === 'timeout' ? 'Screenshot could not be read within 30 seconds' : e.message;
-        console.warn(`${tag} FAILED — ${code}: ${message}${e.detail ? ' | ' + e.detail : ''}`);
-        if (code === 'config') aiHealth = { state: 'key_rejected', message: e.message };
-        return { index: i + 1, ok: false, code, error: message, detail: e.detail || null };
-      } finally {
-        cleanup();
-      }
-    });
-
-    if (reqCtrl.signal.aborted || res.writableEnded) {
-      console.log(`[AI import] browser disconnected after ${((Date.now() - started) / 1000).toFixed(1)}s — stopped early, lock released`);
-      return;
-    }
-
-    const draft = aiKeepOrderFieldsOnly(ai.mergeParcels(results));
-    console.log(`[AI import] done in ${((Date.now() - started) / 1000).toFixed(1)}s — ${draft.stats.used}/${total} screenshots read, ${draft.stats.filled} fields filled`);
-
-    // Even one readable field is a success: the review form opens with it.
-    if (draft.stats.filled > 0) return res.json({ success: true, draft });
-
-    const failed = results.find(r => !r.ok);
-    if (failed) {
-      return res.json({
-        success: false, code: failed.code,
-        message: failed.code === 'network' ? AI_USER_MESSAGES.network : failed.error,
-        detail: failed.detail,
-      });
-    }
-    return res.json({ success: false, code: 'nothing_found', message: 'No name, phone number, tracking ID or price could be read from this screenshot.' });
+    extraction.start(owner, jobId, images);
+    res.json({ success: true, jobId, state: 'running', hardLimitMs: mgr.HARD_LIMIT_MS });
   } catch (e) {
     console.error('[AI import] unexpected error:', e && e.stack || e);
     res.json({ success: false, code: 'upstream', message: 'Unexpected server error while reading the screenshot.', detail: String(e && e.message || e).slice(0, 200) });
-  } finally {
-    aiInFlight.delete(ip);
   }
+});
+
+app.get('/api/ai/extract/:jobId', (req, res) => {
+  const mgr = extraction.manager;
+  const job = mgr.validId(req.params.jobId) ? mgr.get(extractOwner(req), req.params.jobId) : null;
+  if (!job) return res.json({ success: false, code: 'not_found', message: 'Extraction job not found (it may have expired or been cancelled).' });
+  const since = req.query.rev !== undefined && req.query.rev !== '' ? Number(req.query.rev) : undefined;
+  res.json({ success: true, job: mgr.snapshot(job, Number.isFinite(since) ? since : undefined) });
+});
+
+app.post('/api/ai/extract/:jobId/cancel', (req, res) => {
+  const mgr = extraction.manager;
+  if (!mgr.validId(req.params.jobId)) return res.json({ success: false, code: 'bad_image', message: 'Invalid job id.' });
+  const r = mgr.cancel(extractOwner(req), req.params.jobId, 'user');
+  console.log(`[extract ${req.params.jobId.slice(0, 6)}] cancel requested by user — ${r.found ? r.state : 'job not started yet (blocked)'}`);
+  res.json({ success: true, state: r.found ? r.state : 'cancelled' });
 });
 
 // ════════════════════════════════════════════════════════════
@@ -1491,6 +1435,11 @@ async function placeOrder(row, { address = '', whatsapp = null, owner = null } =
 app.post('/api/clients/save', async (req, res) => {
   try {
     if (!req.body || req.body.mode !== 'client_and_order') return saveFail(res, 'Only Place Order is supported');
+    // A cancelled / superseded screenshot extraction must never end up creating an order.
+    const exJob = req.body.extraction_job_id;
+    if (exJob && extraction.manager.validId(String(exJob)) && extraction.manager.wasCancelled(extractOwner(req), String(exJob))) {
+      return saveFail(res, 'This screenshot extraction was cancelled — nothing was saved. Upload the screenshot again or enter the details manually.', { code: 'extraction_cancelled' });
+    }
     const waIn = (req.body.whatsapp && typeof req.body.whatsapp === 'object') ? req.body.whatsapp : null;
     const forValidator = { ...req.body };
     delete forValidator.whatsapp;

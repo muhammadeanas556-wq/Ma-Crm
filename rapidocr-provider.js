@@ -16,10 +16,11 @@
 // ════════════════════════════════════════════════════════════
 
 const RAPIDOCR_BASE_URL = (process.env.RAPIDOCR_BASE_URL || 'http://127.0.0.1:8000').trim().replace(/\/+$/, '');
-// RapidOCR is tried FIRST, before Gemini. If it hasn't answered in this long, give up on
-// it and fall through to Gemini instead of waiting any further (server.js also enforces a
-// 30s wall-clock budget across the whole RapidOCR→Gemini chain for one screenshot).
-const RAPIDOCR_TIMEOUT_MS = Number(process.env.RAPIDOCR_TIMEOUT_MS) || 20000;
+// RapidOCR is tried FIRST, before Gemini. The target is ~4 seconds; this is the hard cut-off
+// for the OCR call (default 6 s). If it hasn't answered by then the pipeline moves on to Gemini
+// instead of waiting any longer. The whole job (OCR + Gemini) is additionally capped at 60 s
+// by extraction-jobs.js.
+const RAPIDOCR_TIMEOUT_MS = Number(process.env.RAPIDOCR_TIMEOUT_MS) || 6000;
 const RAPIDOCR_ENABLED = String(process.env.RAPIDOCR_ENABLED || '1').trim() !== '0';
 
 // Cache /health for a few seconds so a down/slow service doesn't add a health
@@ -86,7 +87,7 @@ async function extractGenericText(image, signal) {
 // it does NOT reimplement validateParcel's own cleanup/aliasing, which still
 // runs afterwards in ai-import.js unchanged.
 const PHONE_RE = /(?<!\d)(?:\+?92[\s-]?3\d{2}|03\d{2}|3\d{2})[\s-]?\d{3}[\s-]?\d{4}(?!\d)/g;
-const COD_LABEL_RE = /(?:COD|CASH ON DELIVERY|COLLECT AMOUNT|AMOUNT)\s*[:#\-]?\s*(?:RS\.?|PKR)?\s*([\d,]{2,})/i;
+const COD_LABEL_RE = /(?:COD(?:\s*AMOUNT)?|CASH ON DELIVERY|COLLECT AMOUNT|ORDER\s*(?:PRICE|AMOUNT|TOTAL)|TOTAL(?:\s*(?:AMOUNT|PRICE))?|PRICE|AMOUNT)\s*[:#\-]?\s*(?:RS\.?|PKR)?\s*([\d][\d,]*)/i;
 const BARE_AMOUNT_RE = /(?:RS\.?|PKR)\s*([\d,]{2,})/i;
 // Require: a real label word, THEN an explicit "No"/"Number"/"ID"/"#" qualifier or a
 // colon/dash separator (not just whitespace — bare "Shipment" next to other printed
@@ -94,16 +95,15 @@ const BARE_AMOUNT_RE = /(?:RS\.?|PKR)\s*([\d,]{2,})/i;
 // value must contain at least one digit (a plain word like "AWBNo" bleeding in from a
 // neighboring label, as happened on a real slip, is all letters and gets rejected).
 const TRACKING_LABEL_RE = /(?:AWB|TRACKING|CONSIGNMENT|CN)\s*(?:NO\.?|NUMBER|ID|#)?\s*[:#\-]\s*([A-Z0-9][A-Z0-9\-]{3,24}\d)(?=\s|$)/i;
-const NAME_LABEL_RE = /(?:NAME|RECEIVER|CONSIGNEE|TO)\s*[:#\-]\s*([A-Za-z][A-Za-z .]{2,40})/i;
+const NAME_LABEL_RE = /\b(?:CUSTOMER(?:\s*NAME)?|NAME|RECEIVER(?:\s*NAME)?|CONSIGNEE(?:\s*NAME)?|TO)\s*[:#\-]\s*([A-Za-z][A-Za-z .]{2,40})/i;
+const PRODUCT_LABEL_RE = /\b(?:PRODUCT(?:\s*NAME)?|ITEM(?:\s*NAME)?|DESCRIPTION|SKU|ITEM\s*DESC(?:RIPTION)?)\s*[:#\-]\s*([^\n]{2,60})/i;
 
-// Only these 4 are actually needed from RapidOCR (product name is entered manually,
-// and address is left to the existing CRM review flow rather than chased here) — this
-// is a deliberately small, fast regex pass, not a full-document read. Anything one of
-// these 4 patterns doesn't confidently match is simply left null; the CRM's existing
-// "check it yourself" review step (ai.validateParcel's own confidence flags) is what
-// surfaces that to the user, so no separate unclear-field bookkeeping is added here.
+// The five fields the CRM needs: name, phone, price, product, tracking. This is a
+// deliberately small, fast regex pass, not a full-document read. Anything a pattern doesn't
+// confidently match is left null — Gemini (step 2) then fills/verifies it from the image,
+// and whatever is still missing stays blank for the user to complete.
 function guessParcelFields(text) {
-  const raw = { client_name: null, phone_number: null, other_phones: [], tracking_id: null, cod_amount: null };
+  const raw = { client_name: null, phone_number: null, other_phones: [], tracking_id: null, cod_amount: null, product_name: null };
   if (!text) return raw;
 
   const phones = [...new Set((text.match(PHONE_RE) || []).map(p => p.trim()))];
@@ -128,6 +128,9 @@ function guessParcelFields(text) {
   const nameMatch = text.match(NAME_LABEL_RE);
   if (nameMatch) raw.client_name = nameMatch[1].trim();
 
+  const productMatch = text.match(PRODUCT_LABEL_RE);
+  if (productMatch) raw.product_name = productMatch[1].trim();
+
   return raw;
 }
 
@@ -141,39 +144,54 @@ function filledCount(raw) {
   if (raw.phone_number) n++;
   if (raw.tracking_id) n++;
   if (raw.cod_amount) n++;
+  if (raw.product_name) n++;
   return n;
 }
 
 // ── PUBLIC ENTRY POINT ───────────────────────────────────────
-// Returns { data, variant: 'rapidocr', timingMs } or throws.
-// `minFilled` lets the caller decide what counts as "sufficient" before it skips
-// the fallback provider (section 3 of the integration task: avoid duplicate OCR
-// requests only once the first provider already returned enough).
-async function tryRapidOcr(image, { signal = null, minFilled = 3 } = {}) {
+// runRapidOcr(): returns { text, raw, filled, timingMs } — ALWAYS including the OCR text and
+// whatever the regex pass found, even when it found very little (that text is handed to
+// Gemini as a hint, and a partial result must never be thrown away).
+// Throws only when RapidOCR could not be used at all: disabled / unavailable / HTTP error /
+// timeout / cancelled (err.code = disabled | unavailable | rapidocr_http | aborted | timeout).
+async function runRapidOcr(image, { signal = null } = {}) {
   if (!RAPIDOCR_ENABLED) {
     const e = new Error('RapidOCR disabled (RAPIDOCR_ENABLED=0)');
     e.code = 'disabled';
     throw e;
   }
   const healthy = await checkHealth(signal);
+  if (signal && signal.aborted) { const e = new Error('cancelled'); e.code = 'aborted'; throw e; }
   if (!healthy) {
     const e = new Error('RapidOCR service unavailable (/health failed)');
     e.code = 'unavailable';
     throw e;
   }
-  const { text, timingMs } = await extractGenericText(image, signal);
-  const raw = guessParcelFields(text);
-  const filled = filledCount(raw);
-  if (filled < minFilled) {
-    const e = new Error(`RapidOCR read too little (${filled} field(s))`);
+  let out;
+  try {
+    out = await extractGenericText(image, signal);
+  } catch (err) {
+    if (signal && signal.aborted) { const e = new Error('cancelled'); e.code = 'aborted'; throw e; }
+    if (err && err.name === 'AbortError') { const e = new Error(`RapidOCR did not answer within ${RAPIDOCR_TIMEOUT_MS / 1000}s`); e.code = 'timeout'; throw e; }
+    throw err;
+  }
+  const raw = guessParcelFields(out.text);
+  return { text: out.text, raw, filled: filledCount(raw), timingMs: out.timingMs, variant: 'rapidocr' };
+}
+
+// Kept for backward compatibility with older callers.
+async function tryRapidOcr(image, { signal = null, minFilled = 3 } = {}) {
+  const r = await runRapidOcr(image, { signal });
+  if (r.filled < minFilled) {
+    const e = new Error(`RapidOCR read too little (${r.filled} field(s))`);
     e.code = 'insufficient';
-    e.raw = raw;
+    e.raw = r.raw;
     throw e;
   }
-  return { data: raw, variant: 'rapidocr', timingMs, filled };
+  return { data: r.raw, variant: 'rapidocr', timingMs: r.timingMs, filled: r.filled };
 }
 
 module.exports = {
   RAPIDOCR_BASE_URL, RAPIDOCR_ENABLED, RAPIDOCR_TIMEOUT_MS,
-  checkHealth, extractGenericText, guessParcelFields, filledCount, tryRapidOcr,
+  checkHealth, extractGenericText, guessParcelFields, filledCount, runRapidOcr, tryRapidOcr,
 };
