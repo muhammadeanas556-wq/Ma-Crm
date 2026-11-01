@@ -938,7 +938,11 @@ app.get('/api/ai/status', (req, res) => {
 // ── Gemini busy (HTTP 500/502/503/504, "high demand") → retry automatically ──
 // A 503 means Google's servers were overloaded; the screenshot never got read.
 // Retry the same model with a short wait, then try any backup models.
-const AI_RETRY_WAITS_MS = [2000, 5000, 10000];
+// Only ONE short retry, ever — regardless of whether a backup key/model exists.
+// (Previously a single-key setup got up to 4 attempts at a 60s timeout each — over
+// 4 minutes worst case. Partial results beat a complete-but-slow one, so we now fail
+// fast to manual entry instead of hammering the same provider.)
+const AI_RETRY_WAITS_MS = [1500];
 function aiIsTransient(e) {
   if (!e) return false;
   if (e.code === 'config' || e.code === 'bad_request' || e.code === 'blocked' || e.code === 'bad_image') return false;
@@ -980,13 +984,13 @@ async function aiCallGeminiWithRetry(opts, log, signal) {
   const now = Date.now();
   let usable = chain.filter(c => (aiCooldown.get(c.id) || 0) <= now);
   if (!usable.length) usable = chain;           // everything cooling down → just try them all again
-  const hasBackup = chain.length > 1;
   const tried = [];
   const errs = [];
   for (const [n, entry] of usable.entries()) {
     if (signal && signal.aborted) throw new ai.AiError('aborted', 'Request was cancelled by the browser');
-    // First provider: patient retries if it is the only one, one quick retry if backups exist.
-    const waits = n === 0 ? (hasBackup ? [2000] : AI_RETRY_WAITS_MS) : [];
+    // First provider gets one quick retry; every other provider in the chain gets none —
+    // move straight on to the next key/model rather than waiting on one that's already slow.
+    const waits = n === 0 ? AI_RETRY_WAITS_MS : [];
     for (let attempt = 0; attempt <= waits.length; attempt++) {
       try {
         const out = entry.kind === 'gemini'
@@ -1106,38 +1110,65 @@ app.post('/api/ai/extract', async (req, res) => {
     }
 
     const total = images.length;
+    // Hard wall-clock budget for ONE screenshot's whole read: RapidOCR first, then —
+    // only if time remains — Gemini/NVIDIA. Past this, stop trying and leave the field
+    // blank for manual entry rather than let a slow engine hold up the batch.
+    const AI_PER_IMAGE_BUDGET_MS = 30000;
     const results = await aiMapLimit(images, 2, async (image, i) => {
       const tag = `[AI import] screenshot ${i + 1}/${total} (model ${GEMINI_MODEL}, ${image.mime}, ${Math.max(1, Math.round(image.bytes / 1024))} KB)`;
+      const deadline = Date.now() + AI_PER_IMAGE_BUDGET_MS;
 
-      // Priority 1: RapidOCR (local/self-hosted, fast). Only its OCR text-recognition
-      // stage replaces anything here — the result is still run through
+      // Shared abort for this one image: fires on the 30s budget OR if the browser
+      // disconnects (reqCtrl) — whichever comes first. RapidOCR and Gemini both see it,
+      // so a slow RapidOCR call doesn't eat into Gemini's share of the 30s, and neither
+      // engine runs a moment longer than the browser is still waiting.
+      const imgCtrl = new AbortController();
+      const budgetTimer = setTimeout(() => imgCtrl.abort(), AI_PER_IMAGE_BUDGET_MS);
+      const onParentAbort = () => imgCtrl.abort();
+      reqCtrl.signal.addEventListener('abort', onParentAbort, { once: true });
+      const cleanup = () => { clearTimeout(budgetTimer); reqCtrl.signal.removeEventListener('abort', onParentAbort); };
+
+      // Priority 1: RapidOCR (local/self-hosted, fast — tried before Gemini). Its own
+      // RAPIDOCR_TIMEOUT_MS (20s) governs a single slow HTTP call; this shared imgCtrl
+      // additionally cuts it off the moment the 30s total budget runs out. Only its OCR
+      // text-recognition stage replaces anything here — the result still goes through
       // ai.validateParcel(), the CRM's existing field-extraction/mapping/validation
-      // logic, unchanged. On any failure, or too little read, fall through to the
-      // existing Gemini/NVIDIA provider chain (priority 2) below — no change to that
-      // path, no duplicate RapidOCR calls.
+      // logic, unchanged. On any failure, timeout, or too little read, fall through to
+      // Gemini/NVIDIA (priority 2) below, using whatever's left of the 30s.
       try {
-        const rOut = await rapidocr.tryRapidOcr(image, { signal: reqCtrl.signal });
+        const rOut = await rapidocr.tryRapidOcr(image, { signal: imgCtrl.signal });
         const data = ai.validateParcel(rOut.data);
         console.log(`${tag} OK via RapidOCR (${rOut.filled} field(s), ${rOut.timingMs && Math.round(rOut.timingMs.total_ms)}ms OCR)`);
+        cleanup();
         return { index: i + 1, ok: true, data };
       } catch (e) {
-        if (e.code === 'aborted') throw e;
+        if (reqCtrl.signal.aborted) { cleanup(); throw new ai.AiError('aborted', 'Request was cancelled by the browser'); }
         console.warn(`${tag} RapidOCR skipped (${e.code || 'error'}: ${e.message}) — falling back to Gemini/NVIDIA`);
+      }
+
+      if (Date.now() >= deadline) {
+        cleanup();
+        console.warn(`${tag} FAILED — 30s budget used up before Gemini could be tried`);
+        return { index: i + 1, ok: false, code: 'timeout', error: 'Screenshot could not be read within 30 seconds', detail: null };
       }
 
       try {
         const out = await aiCallGeminiWithRetry({
           apiKey: GEMINI_API_KEY, model: GEMINI_MODEL, image, index: i + 1, total,
           onLog: msg => console.warn(`${tag} ${msg}`),
-        }, msg => console.warn(`${tag} ${msg}`), reqCtrl.signal);
+        }, msg => console.warn(`${tag} ${msg}`), imgCtrl.signal);
         const data = ai.validateParcel(out.data);
         console.log(`${tag} OK via ${out.provider || 'Gemini'} ("${out.variant}" request)`);
         return { index: i + 1, ok: true, data };
       } catch (e) {
-        const code = e.code || 'upstream';
-        console.warn(`${tag} FAILED — ${code}: ${e.message}${e.detail ? ' | ' + e.detail : ''}`);
+        if (reqCtrl.signal.aborted) throw new ai.AiError('aborted', 'Request was cancelled by the browser');
+        const code = imgCtrl.signal.aborted && e.code !== 'config' ? 'timeout' : (e.code || 'upstream');
+        const message = code === 'timeout' ? 'Screenshot could not be read within 30 seconds' : e.message;
+        console.warn(`${tag} FAILED — ${code}: ${message}${e.detail ? ' | ' + e.detail : ''}`);
         if (code === 'config') aiHealth = { state: 'key_rejected', message: e.message };
-        return { index: i + 1, ok: false, code, error: e.message, detail: e.detail || null };
+        return { index: i + 1, ok: false, code, error: message, detail: e.detail || null };
+      } finally {
+        cleanup();
       }
     });
 

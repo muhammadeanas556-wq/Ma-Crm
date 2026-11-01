@@ -1,0 +1,10 @@
+services:
+  form-extraction-service:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      # Trained weights are gitignored (not baked into the image build context in a
+      # meaningful way beyond whatever was present at build time) — mounting them lets
+      # you swap in a retrained model (e.g. yolo11s) without rebuilding the image.
+      - ./models:/srv/models:ro

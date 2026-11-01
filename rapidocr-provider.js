@@ -16,7 +16,10 @@
 // ════════════════════════════════════════════════════════════
 
 const RAPIDOCR_BASE_URL = (process.env.RAPIDOCR_BASE_URL || 'http://127.0.0.1:8000').trim().replace(/\/+$/, '');
-const RAPIDOCR_TIMEOUT_MS = Number(process.env.RAPIDOCR_TIMEOUT_MS) || 3000;
+// RapidOCR is tried FIRST, before Gemini. If it hasn't answered in this long, give up on
+// it and fall through to Gemini instead of waiting any further (server.js also enforces a
+// 30s wall-clock budget across the whole RapidOCR→Gemini chain for one screenshot).
+const RAPIDOCR_TIMEOUT_MS = Number(process.env.RAPIDOCR_TIMEOUT_MS) || 20000;
 const RAPIDOCR_ENABLED = String(process.env.RAPIDOCR_ENABLED || '1').trim() !== '0';
 
 // Cache /health for a few seconds so a down/slow service doesn't add a health

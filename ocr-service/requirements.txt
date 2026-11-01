@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+pymupdf
+opencv-python-headless
+numpy
+pillow
+ultralytics
+rapidocr-onnxruntime
+transformers<5  # microsoft/trocr-base-handwritten has no fast tokenizer.json; transformers 5.x dropped legacy slow-tokenizer conversion
+sentencepiece
+kagglehub
+requests
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
