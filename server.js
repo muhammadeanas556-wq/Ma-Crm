@@ -1091,7 +1091,7 @@ function aiKeepOrderFieldsOnly(draft) {
 //   GET  /api/ai/extract/:id?rev=N                   → progress + (partial → final) draft
 //   POST /api/ai/extract/:id/cancel                  → aborts RapidOCR + Gemini, marks it cancelled
 // RapidOCR runs first (~4 s) and its result is published immediately; Gemini then verifies it
-// against the image. Hard limit for the whole job: 60 s (EXTRACT_HARD_LIMIT_MS).
+// against the image. Hard limit for the whole job: 120 s (EXTRACT_HARD_LIMIT_MS).
 const extraction = createExtractionService({
   ai, rapidocr,
   geminiAvailable: () => aiBuildChain().length > 0,

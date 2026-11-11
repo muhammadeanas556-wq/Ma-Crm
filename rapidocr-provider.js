@@ -20,7 +20,7 @@ const RAPIDOCR_BASE_URL = (process.env.RAPIDOCR_BASE_URL || 'http://127.0.0.1:80
 // for the OCR call (default 6 s). If it hasn't answered by then the pipeline moves on to Gemini
 // instead of waiting any longer. The whole job (OCR + Gemini) is additionally capped at 60 s
 // by extraction-jobs.js.
-const RAPIDOCR_TIMEOUT_MS = Number(process.env.RAPIDOCR_TIMEOUT_MS) || 6000;
+const RAPIDOCR_TIMEOUT_MS = Number(process.env.RAPIDOCR_TIMEOUT_MS) || 60000;   // TESTING: 60 s (same as Gemini)
 const RAPIDOCR_ENABLED = String(process.env.RAPIDOCR_ENABLED || '1').trim() !== '0';
 
 // Cache /health for a few seconds so a down/slow service doesn't add a health

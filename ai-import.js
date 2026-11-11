@@ -11,7 +11,7 @@ const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 const LIMITS = {
   MAX_IMAGES: 5,
   MAX_IMAGE_BYTES: 5 * 1024 * 1024,   // after base64 decode
-  TIMEOUT_MS: 15000,   // per HTTP attempt — a vision read that hasn't answered in 15s is not going to help a 100-200/session workflow
+  TIMEOUT_MS: 60000,   // TESTING: 60 s (same as RapidOCR) —   // per HTTP attempt — a vision read that hasn't answered in 15s is not going to help a 100-200/session workflow
 };
 
 const CONF = ['high', 'medium', 'low'];

@@ -5,7 +5,7 @@
 //    Step 1  RapidOCR  (target ~4 s)   → partial result is published immediately
 //    Step 2  Gemini    (gets the image + RapidOCR's text as a hint)
 //            → field-level merge with RapidOCR's result
-//    Hard cap: 60 s for the whole job (EXTRACT_HARD_LIMIT_MS)
+//    Hard cap: 120 s for the whole job (60 s RapidOCR + 60 s Gemini) (EXTRACT_HARD_LIMIT_MS)
 //
 //  Rules implemented here
 //   • Never reject an incomplete screenshot: whatever was read is returned, the rest stays blank.
@@ -17,8 +17,8 @@
 // ════════════════════════════════════════════════════════════
 const crypto = require('crypto');
 
-const HARD_LIMIT_MS   = Number(process.env.EXTRACT_HARD_LIMIT_MS) || 60000;   // whole job
-const GEMINI_WINDOW_MS = Number(process.env.GEMINI_WINDOW_MS) || 40000;       // Gemini's share
+const HARD_LIMIT_MS   = Number(process.env.EXTRACT_HARD_LIMIT_MS) || 120000;   // whole job
+const GEMINI_WINDOW_MS = Number(process.env.GEMINI_WINDOW_MS) || 60000;       // Gemini's share
 const KEEP_FINISHED_MS = 5 * 60 * 1000;                                       // result kept for polling
 const TOMBSTONE_MS     = 10 * 60 * 1000;                                      // "this id was cancelled"
 const JOB_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
@@ -348,7 +348,7 @@ function createExtractionService(deps) {
       await Promise.all(Array.from({ length: Math.min(2, images.length) }, worker));
 
       if (job.state !== 'running') return;       // cancelled (user / superseded) — publish nothing
-      // Whatever happened (incl. the 60 s deadline), finish with the best draft we have.
+      // Whatever happened (incl. the hard-limit deadline), finish with the best draft we have.
       let draft = null;
       try { draft = buildDraft(job.slots, total); } catch (e) { log(`[extract ${job.id.slice(0, 6)}] draft build failed: ${e.message}`); }
       if (job.timedOut) job.notes.deadline = `stopped at ${HARD_LIMIT_MS / 1000}s hard limit`;
