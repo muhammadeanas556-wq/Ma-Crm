@@ -6044,7 +6044,9 @@ async function aiPollJob(jobId, ctrl, current) {
       if (j.rev !== undefined) rev = j.rev;
       if (j.state === 'cancelled') return;
       const draft = j.draft;
-      if (draft && aiHasAny(draft)) {
+      // RapidOCR finished (even if its regex found nothing) -> open the form now; Gemini fills blanks later.
+      const ocrDone = !!(j.notes && /^ok/.test(j.notes.rapidocr || '')) && j.stage !== 'ocr';
+      if (draft && (aiHasAny(draft) || (!shown && ocrDone))) {
         if (!shown) {                                        // first usable result (RapidOCR, ~4 s) → show it NOW
           shown = true;
           aiState.draft = draft;
