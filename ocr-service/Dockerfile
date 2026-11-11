@@ -11,7 +11,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
-COPY models ./models
+RUN mkdir -p /srv/models   # signature weights are not in the repo; the generic OCR endpoint does not need them
 
 ENV PYTHONUNBUFFERED=1
 EXPOSE 8000
