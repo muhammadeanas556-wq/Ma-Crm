@@ -298,6 +298,7 @@ function createExtractionService(deps) {
     }
     if (job.state !== 'running') return;
     job.stage = 'gemini';
+    job.rev++;                                   // stage/notes changed -> make pollers re-read even if the draft is unchanged
     publish();                                   // ← usable partial result shown to the user right away
 
     // ── Step 2: Gemini (image + RapidOCR text) ──
