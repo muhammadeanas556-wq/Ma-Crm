@@ -1,3 +1,5 @@
+import asyncio
+import concurrent.futures
 import json
 import time
 
@@ -5,7 +7,7 @@ import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 
 from app.pipeline import fields_regex, preprocess
-from app.pipeline.ocr import rapidocr_engine
+from app.pipeline.ocr import paddleocr_engine, rapidocr_engine
 from app.pipeline.ocr import router as ocr_router
 from app.pipeline.ocr import text_extractor
 from app.pipeline.signature import service as signature_service
@@ -21,6 +23,16 @@ from app.templates import DocumentTemplate, get_template
 
 app = FastAPI(title="Banking Form Extraction Service")
 
+# Primary OCR engine for the template-free parcel-screenshot endpoint is PaddleOCR.
+# It gets a hard 60-second budget (matches the CRM's PADDLEOCR_TIMEOUT_MS default):
+# if it hasn't finished by then, this endpoint fails fast with a 504 so the CRM's
+# paddleocr-provider.js can move straight on to its Gemini fallback instead of the
+# request hanging indefinitely. PaddleOCR's own .ocr() call is synchronous/CPU-bound,
+# so it runs in a worker thread that can be abandoned on timeout without blocking the
+# event loop for other requests.
+PADDLEOCR_TIMEOUT_S = 60
+_paddleocr_pool = concurrent.futures.ThreadPoolExecutor(max_workers=2, thread_name_prefix="paddleocr")
+
 
 @app.get("/health")
 def health():
@@ -32,11 +44,16 @@ async def extract_text_generic(file: UploadFile = File(...)):
     """Template-free whole-page OCR: no document_type, no ROI boxes — used for screenshots
     whose layout isn't known in advance (courier/COD parcel labels, which vary by courier
     and by handwriting, unlike the fixed bank-form templates the rest of this service is
-    built around). Runs one full-page RapidOCR detect+recognize pass (rapidocr_engine.
-    run_page_ocr with rois=None, i.e. every detected box gets recognized, not just boxes
-    near a known field) and returns the boxes joined into reading-order text. A caller
-    (e.g. the CRM's own field-extraction/regex logic) is expected to pull whatever fields
-    it needs out of that text itself — this endpoint does no field-specific parsing.
+    built around). Runs one full-page PaddleOCR detect+recognize pass (paddleocr_engine.
+    run_page_ocr, every detected box recognized) and returns the boxes joined into
+    reading-order text. A caller (e.g. the CRM's own field-extraction/regex logic) is
+    expected to pull whatever fields it needs out of that text itself — this endpoint
+    does no field-specific parsing.
+
+    On any PaddleOCR failure or timeout (>60s) this raises an HTTP error (504 for the
+    timeout, 502 for any other PaddleOCR exception) rather than ever falling back to
+    RapidOCR itself: the automatic "move to Gemini" fallback is the CRM's job
+    (paddleocr-provider.js / extraction-jobs.js), not this service's.
     """
     file_bytes = await file.read()
     t0 = time.perf_counter()
@@ -47,7 +64,16 @@ async def extract_text_generic(file: UploadFile = File(...)):
     preprocess_ms = (time.perf_counter() - t0) * 1000
 
     t1 = time.perf_counter()
-    boxes = rapidocr_engine.run_page_ocr(page, rois=None)
+    loop = asyncio.get_running_loop()
+    future = loop.run_in_executor(_paddleocr_pool, paddleocr_engine.run_page_ocr, page)
+    try:
+        boxes = await asyncio.wait_for(future, timeout=PADDLEOCR_TIMEOUT_S)
+    except (TimeoutError, asyncio.TimeoutError) as exc:
+        raise HTTPException(
+            status_code=504, detail=f"PaddleOCR did not finish within {PADDLEOCR_TIMEOUT_S}s"
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"PaddleOCR failed: {exc}") from exc
     text = text_extractor.build_reading_order_text(boxes)
     ocr_ms = (time.perf_counter() - t1) * 1000
 

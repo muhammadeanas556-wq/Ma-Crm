@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const ai = require('../ai-import');
-const rapidocrReal = require('../rapidocr-provider');
+const paddleocrReal = require('../paddleocr-provider');
 const { createExtractionService, createMerger, fiveFieldSummary } = require('../extraction-jobs');
 
 const IMG = { mime: 'image/png', base64: 'AAAA', bytes: 3 };
@@ -18,7 +18,7 @@ const finalize = d => { d.client = { name: d.client.name, phones: d.client.phone
 
 function service({ ocr, gemini, geminiOn = true }) {
   return createExtractionService({
-    ai, rapidocr: { runRapidOcr: ocr }, geminiAvailable: () => geminiOn,
+    ai, paddleocr: { runPaddleOcr: ocr }, geminiAvailable: () => geminiOn,
     callGemini: gemini, finalizeDraft: finalize, log: () => {},
   });
 }
@@ -32,7 +32,7 @@ const gemOut = raw => async () => ({ data: raw });
 const R = o => Object.assign({ client_name: null, phone_number: null, other_phones: [], tracking_id: null, cod_amount: null, address: null, product_name: null, unclear_fields: [] }, o);
 const val = (d, k) => (k === 'phone' ? (d.client.phones[0] || {}).value : k === 'name' ? d.client.name.value : d.order[k] && d.order[k].value);
 
-test('1. RapidOCR extracts all five → all five present', async () => {
+test('1. PaddleOCR extracts all five → all five present', async () => {
   const svc = service({ ocr: ocrOut(R({ client_name: 'Ahmed Khan', phone_number: '03001234567', tracking_id: 'LP123456', cod_amount: '2500', product_name: 'Face Serum' }), 'Name: Ahmed Khan 0300 1234567 LP123456 COD 2500 Face Serum'),
     gemini: gemOut(R({ client_name: 'Ahmed Khan', phone_number: '03001234567', tracking_id: 'LP123456', cod_amount: 2500, product_name: 'Face Serum' })) });
   svc.start('u1', 'job-aaaaaaaa1', [IMG]);
@@ -41,7 +41,7 @@ test('1. RapidOCR extracts all five → all five present', async () => {
   assert.deepEqual(j.draft.stats.five.missing, []);
 });
 
-test('2/3. RapidOCR partial, Gemini fills the rest (spec example)', async () => {
+test('2/3. PaddleOCR partial, Gemini fills the rest (spec example)', async () => {
   const svc = service({
     ocr: ocrOut(R({ client_name: 'Ahmed', phone_number: '03001234567', product_name: 'Face Serum' }), 'Ahmed 03001234567 Face Serum'),
     gemini: gemOut(R({ client_name: 'Ahmed', cod_amount: 2500, product_name: 'Face Serum', tracking_id: 'LP123456' })) });
@@ -53,7 +53,7 @@ test('2/3. RapidOCR partial, Gemini fills the rest (spec example)', async () => 
   assert.equal(d.stats.five.filled, 5);
 });
 
-test('partial result is published after RapidOCR, BEFORE Gemini finishes', async () => {
+test('partial result is published after PaddleOCR, BEFORE Gemini finishes', async () => {
   const svc = service({
     ocr: ocrOut(R({ client_name: 'Ahmed', phone_number: '03001234567' }), 'Ahmed 03001234567'),
     gemini: async (o, l, signal) => abortable(800, signal, { data: R({ client_name: 'Ahmed', tracking_id: 'LP123456' }) }) });
@@ -66,15 +66,15 @@ test('partial result is published after RapidOCR, BEFORE Gemini finishes', async
   assert.equal(j.draft.stats.five.filled, 3);
 });
 
-test('4. RapidOCR fails, Gemini succeeds', async () => {
+test('4. PaddleOCR fails, Gemini succeeds', async () => {
   const svc = service({ ocr: async () => { const e = new Error('down'); e.code = 'unavailable'; throw e; },
     gemini: gemOut(R({ client_name: 'Sara', phone_number: '03111234567', cod_amount: 1800, tracking_id: 'AB998877', product_name: 'Cream' })) });
   svc.start('u1', 'job-aaaaaaaa4', [IMG]);
   const j = await waitFinal(svc, 'u1', 'job-aaaaaaaa4');
-  assert.equal(j.draft.stats.five.filled, 5); assert.match(j.notes.rapidocr, /failed/);
+  assert.equal(j.draft.stats.five.filled, 5); assert.match(j.notes.paddleocr, /failed/);
 });
 
-test('5. Gemini fails → RapidOCR result is kept', async () => {
+test('5. Gemini fails → PaddleOCR result is kept', async () => {
   const svc = service({ ocr: ocrOut(R({ client_name: 'Ahmed', phone_number: '03001234567' }), 'Ahmed 03001234567'),
     gemini: async () => { const e = new Error('quota'); e.code = 'rate_limited'; throw e; } });
   svc.start('u1', 'job-aaaaaaaa5', [IMG]);
@@ -117,7 +117,7 @@ test('hard limit: job finishes by the deadline with partial data', async () => {
   process.env.EXTRACT_HARD_LIMIT_MS = '400';
   delete require.cache[require.resolve('../extraction-jobs')];
   const { createExtractionService: mk } = require('../extraction-jobs');
-  const svc = mk({ ai, rapidocr: { runRapidOcr: ocrOut(R({ client_name: 'Ahmed' }), 'Ahmed') }, geminiAvailable: () => true,
+  const svc = mk({ ai, paddleocr: { runPaddleOcr: ocrOut(R({ client_name: 'Ahmed' }), 'Ahmed') }, geminiAvailable: () => true,
     callGemini: async (o, l, signal) => abortable(10000, signal, { data: R({}) }), finalizeDraft: finalize, log: () => {} });
   const t0 = Date.now();
   svc.start('u1', 'job-aaaaaa10', [IMG]);
@@ -127,11 +127,11 @@ test('hard limit: job finishes by the deadline with partial data', async () => {
   delete process.env.EXTRACT_HARD_LIMIT_MS; delete require.cache[require.resolve('../extraction-jobs')];
 });
 
-test('Gemini window: slow Gemini is cut off, RapidOCR data kept', async () => {
+test('Gemini window: slow Gemini is cut off, PaddleOCR data kept', async () => {
   process.env.GEMINI_WINDOW_MS = '200';
   delete require.cache[require.resolve('../extraction-jobs')];
   const { createExtractionService: mk } = require('../extraction-jobs');
-  const svc = mk({ ai, rapidocr: { runRapidOcr: ocrOut(R({ client_name: 'Ahmed' }), 'Ahmed') }, geminiAvailable: () => true,
+  const svc = mk({ ai, paddleocr: { runPaddleOcr: ocrOut(R({ client_name: 'Ahmed' }), 'Ahmed') }, geminiAvailable: () => true,
     callGemini: async (o, l, signal) => abortable(10000, signal, { data: R({}) }), finalizeDraft: finalize, log: () => {} });
   svc.start('u1', 'job-aaaaaa11', [IMG]);
   const j = await waitFinal(svc, 'u1', 'job-aaaaaa11', 3000);
@@ -140,7 +140,7 @@ test('Gemini window: slow Gemini is cut off, RapidOCR data kept', async () => {
 });
 
 // ── cancellation ──
-test('C1. cancel aborts the in-flight RapidOCR AND Gemini requests', async () => {
+test('C1. cancel aborts the in-flight PaddleOCR AND Gemini requests', async () => {
   let ocrAborted = false, gemAborted = false;
   const svc = service({
     ocr: async (img, { signal }) => { try { return await abortable(5000, signal, { text: '', raw: R({}), filled: 0 }); } catch (e) { ocrAborted = true; throw e; } },
@@ -194,7 +194,7 @@ test('C5. jobs are private to their owner', async () => {
   assert.equal(svc.manager.get('u2', 'job-aaaaaa17'), null);
 });
 
-test('RapidOCR regex: price / product / name labels', () => {
-  const r = rapidocrReal.guessParcelFields('Customer Name: Ali Raza\nPhone 0312 3456789\nProduct: Hair Oil\nOrder Price: Rs. 2,800\nTracking ID: LP12345678');
+test('PaddleOCR regex: price / product / name labels', () => {
+  const r = paddleocrReal.guessParcelFields('Customer Name: Ali Raza\nPhone 0312 3456789\nProduct: Hair Oil\nOrder Price: Rs. 2,800\nTracking ID: LP12345678');
   assert.equal(r.client_name, 'Ali Raza'); assert.equal(r.product_name, 'Hair Oil'); assert.equal(r.cod_amount, '2,800'); assert.equal(r.tracking_id, 'LP12345678');
 });

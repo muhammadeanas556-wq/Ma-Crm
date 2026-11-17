@@ -1,24 +1,29 @@
-## Used by the MA CRM as `RAPIDOCR_BASE_URL`
+## Used by the MA CRM as `PADDLEOCR_BASE_URL`
 
 This copy adds one extra endpoint, `POST /extract-text-generic`, on top of the original
 service below: a template-free whole-page OCR pass (no `document_type`, no ROI boxes —
-the rest of this service only works for one fixed, pre-calibrated form layout). It runs
-RapidOCR over the full image and returns the detected text in reading order, so it works
-on screenshots whose layout isn't known in advance (courier/COD parcel labels, which vary
-by courier and by handwriting). The CRM's `rapidocr-provider.js` calls this endpoint, then
-runs its own regex field-guessing over the returned text — this service does no
-parcel-specific field parsing itself.
+the rest of this service only works for one fixed, pre-calibrated form layout and still
+uses RapidOCR, unchanged). The generic endpoint runs **PaddleOCR** over the full image
+and returns the detected text in reading order, so it works on screenshots whose layout
+isn't known in advance (courier/COD parcel labels, which vary by courier and by
+handwriting). The CRM's `paddleocr-provider.js` calls this endpoint, then runs its own
+regex field-guessing over the returned text — this service does no parcel-specific field
+parsing itself.
 
 **Run this as its own process** (`uvicorn app.main:app --host 0.0.0.0 --port 8000`, or
 the included `Dockerfile`/`compose.yaml`). It is Python/FastAPI; the CRM (`server.js`) is
-Node and only talks to it over HTTP via `RAPIDOCR_BASE_URL` in `.env` — on Render that
+Node and only talks to it over HTTP via `PADDLEOCR_BASE_URL` in `.env` — on Render that
 means a second Web Service, pointed at from the CRM's environment variables. Running it
-locally alongside the CRM for development is just `RAPIDOCR_BASE_URL=http://127.0.0.1:8000`.
+locally alongside the CRM for development is just `PADDLEOCR_BASE_URL=http://127.0.0.1:8000`.
 
-In the CRM's extraction order: **RapidOCR is tried first** (its own 20s timeout,
-`RAPIDOCR_TIMEOUT_MS`), then Gemini/NVIDIA if it fails or times out — the whole chain for
-one screenshot is capped at 30 seconds total, after which the CRM gives up and leaves the
-field blank for manual entry rather than waiting further.
+In the CRM's extraction order: **PaddleOCR is tried first**, with a hard 60-second cap
+on `/extract-text-generic` itself (`PADDLEOCR_TIMEOUT_S` in `app/main.py`) matched by the
+CRM's own `PADDLEOCR_TIMEOUT_MS` (default 60000). If PaddleOCR fails, errors, or doesn't
+finish in that window, the CRM automatically — and only then — calls Gemini with the
+original screenshot; PaddleOCR and Gemini never run at the same time. The whole job
+(PaddleOCR + Gemini) is capped at 120 seconds total (`EXTRACT_HARD_LIMIT_MS` in
+`extraction-jobs.js`), after which the CRM gives up and leaves any still-missing field
+blank for manual entry rather than waiting further.
 
 ---
 

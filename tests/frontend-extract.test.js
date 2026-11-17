@@ -28,7 +28,7 @@ function sandbox(handler) {
 }
 const draft = (n, fin) => ({ client: {}, order: {}, warnings: [], stats: { filled: n, five: { filled: n, missing: [] } } });
 
-test('F1. RapidOCR partial shows immediately, Gemini final applied after', async () => {
+test('F1. PaddleOCR partial shows immediately, Gemini final applied after', async () => {
   let polls = 0;
   const { ctx, log } = sandbox(url => {
     if (url === '/api/ai/extract') return { success: true, jobId: 'x' };

@@ -1366,6 +1366,7 @@ body {
 .ai-f .ai-invalid, .ai-line .ai-invalid { border-color:var(--red) !important; box-shadow:0 0 0 2px rgba(239,68,68,.2); }
 .ai-meta { font-size:11px; color:var(--muted); font-family:var(--mono); line-height:1.5; word-break:break-word; }
 .ai-meta.ai-meta-warn { color:#f7c56b; }
+.ai-meta.ai-meta-missing { color:var(--muted); font-style:italic; }
 .ai-missing-note { border-radius:var(--r-md); padding:9px 12px; font-size:12.5px; line-height:1.55; margin-bottom:10px; border:1px solid rgba(245,158,11,.35); background:var(--yellow-dim); color:#f7c56b; font-weight:600; }
 .ai-refine { display:flex; align-items:center; gap:10px; border-radius:var(--r-md); padding:8px 12px; font-size:12px; margin-bottom:10px; border:1px solid var(--border); background:var(--bg3); color:var(--muted); }
 .ai-refine i { width:14px; height:14px; border-radius:50%; border:2px solid var(--bg4); border-top-color:var(--accent2); animation:aiSpin .8s linear infinite; flex:none; }
@@ -5722,7 +5723,7 @@ function aiRequestClose() {
   if (aiState.step === 'progress') { aiCloseModal(); aiReset(); return; }   // order is saved; WhatsApp keeps going on the server
   if (aiState.step === 'review' && aiState.draft &&
       !confirm('AI extracted details discard karein? Abhi tak kuch bhi save nahi hua.')) return;
-  aiCancelExtract({ silent: true });   // X = really cancel: abort RapidOCR + Gemini requests, mark the job cancelled
+  aiCancelExtract({ silent: true });   // X = really cancel: abort PaddleOCR + Gemini requests, mark the job cancelled
   aiCloseModal();
   aiReset();
 }
@@ -5976,8 +5977,8 @@ function aiRemoveImage(i) { aiCancelExtract({ silent: true }); aiState.images.sp
 function aiRemoveAll() { aiCancelExtract({ silent: true }); aiState.images = []; aiRenderPreviews(); }
 
 // ── EXTRACT ─────────────────────────────────────────────────
-// Flow: POST /api/ai/extract starts a JOB (RapidOCR first, then Gemini on the server) and answers at once.
-// We poll the job: as soon as RapidOCR has produced something, the review form opens with it; when
+// Flow: POST /api/ai/extract starts a JOB (PaddleOCR first, then Gemini on the server) and answers at once.
+// We poll the job: as soon as PaddleOCR has produced something, the review form opens with it; when
 // Gemini finishes, its verified result is merged in (never over fields the user already edited).
 // Every request uses one AbortController, and the X / Cancel / replace paths also tell the server
 // to cancel the job. Responses that belong to an old job id are ignored.
@@ -6051,10 +6052,10 @@ async function aiPollJob(jobId, ctrl, current) {
       if (j.rev !== undefined) rev = j.rev;
       if (j.state === 'cancelled') return;
       const draft = j.draft;
-      // RapidOCR finished (even if its regex found nothing) -> open the form now; Gemini fills blanks later.
-      const ocrDone = !!(j.notes && /^ok/.test(j.notes.rapidocr || '')) && j.stage !== 'ocr';
+      // PaddleOCR finished (even if its regex found nothing) -> open the form now; Gemini fills blanks later.
+      const ocrDone = !!(j.notes && /^ok/.test(j.notes.paddleocr || '')) && j.stage !== 'ocr';
       if (draft && (aiHasAny(draft) || (!shown && ocrDone))) {
-        if (!shown) {                                        // first usable result (RapidOCR, ~4 s) → show it NOW
+        if (!shown) {                                        // first usable result (PaddleOCR, ~4 s) → show it NOW
           shown = true;
           aiState.draft = draft;
           aiState.refining = !j.final;
@@ -6071,7 +6072,7 @@ async function aiPollJob(jobId, ctrl, current) {
         }
       }
       if (!j.final && !shown) {
-        aiById('aiLoadingSub').textContent = j.stage === 'gemini' ? 'RapidOCR ho gaya — Gemini check kar raha hai' : 'RapidOCR screenshot parh raha hai';
+        aiById('aiLoadingSub').textContent = j.stage === 'gemini' ? 'PaddleOCR ho gaya — Gemini check kar raha hai' : 'PaddleOCR screenshot parh raha hai';
       }
       if (j.final) {
         aiSetRefine(false);
@@ -6102,7 +6103,7 @@ function aiOpenManualAfterExtract({ draft, notes, error, timedOut, message } = {
   aiState.refining = false;
   aiRenderReview(aiState.draft);
   aiShowStep('review');
-  const why = message || (error && error.message) || (notes && ((notes.gemini && /failed|timeout|not configured/.test(notes.gemini) ? 'Gemini: ' + notes.gemini : '') || (notes.rapidocr && /failed/.test(notes.rapidocr) ? 'RapidOCR: ' + notes.rapidocr : ''))) || '';
+  const why = message || (error && error.message) || (notes && ((notes.gemini && /failed|timeout|not configured/.test(notes.gemini) ? 'Gemini: ' + notes.gemini : '') || (notes.paddleocr && /failed/.test(notes.paddleocr) ? 'PaddleOCR: ' + notes.paddleocr : ''))) || '';
   const box = aiById('aiMissingNote');
   if (box && why) box.insertAdjacentHTML('afterend', `<div class="ai-meta" style="margin:-4px 0 10px">${esc(why)}${timedOut ? ' (time limit reached)' : ''} <button type="button" class="ai-textlink" style="display:inline;margin-left:6px" onclick="aiRetryFromReview()">Retry extraction</button></div>`);
   aiById('aiImportModal').querySelector('.ai-modal').scrollTop = 0;
@@ -6193,7 +6194,7 @@ function aiSendCancel(jobId) {
 }
 
 // Cancels the active extraction everywhere: browser requests (AbortController), the job on the server
-// (which aborts RapidOCR + Gemini), and the UI state. After this, no late response can change the UI.
+// (which aborts PaddleOCR + Gemini), and the UI state. After this, no late response can change the UI.
 function aiCancelExtract(opts) {
   const jobId = aiState.jobId;
   if (aiState.abort) { try { aiState.abort.abort(); } catch (e) { console.warn('[CRM]', e); } }
@@ -6268,6 +6269,11 @@ function aiMeta(f, fmt) {
   if ((f.value === null || f.value === undefined) && (f.evidence || f.note)) {
     return `<div class="ai-meta ai-meta-warn">${f.note ? esc(f.note) + '. ' : ''}${f.evidence ? 'Screenshot mein “' + esc(f.evidence) + '” dikha, lekin clear nahi — ' : ''}khud check karke bharein.</div>`;
   }
+  // Required field the OCR pipeline (PaddleOCR / Gemini) could not read at all: never
+  // guess a value — leave it blank and say so, per spec.
+  if (f.value === null || f.value === undefined) {
+    return `<div class="ai-meta ai-meta-missing">I will check</div>`;
+  }
   return '';
 }
 
@@ -6287,7 +6293,8 @@ function aiPhoneRowHtml(p, first) {
     : '<button type="button" class="ai-sq-btn ai-sq-del" onclick="aiRemovePhone(this)" title="Remove this number" aria-label="Remove this number">−</button>';
   const typeTag = p && p.type === 'whatsapp' ? '<span class="ai-phone-type">WhatsApp</span>' : '';
   const meta = p && p.evidence
-    ? `<div class="ai-meta${p.note ? ' ai-meta-warn' : ''}">Seen in${aiSrc(p.sources) || ' screenshot'}: “${esc(p.evidence)}”${p.note ? ' — ' + esc(p.note) : (p.confidence === 'low' ? ' — verify' : '')}</div>` : '';
+    ? `<div class="ai-meta${p.note ? ' ai-meta-warn' : ''}">Seen in${aiSrc(p.sources) || ' screenshot'}: “${esc(p.evidence)}”${p.note ? ' — ' + esc(p.note) : (p.confidence === 'low' ? ' — verify' : '')}</div>`
+    : (!p ? `<div class="ai-meta ai-meta-missing">I will check</div>` : '');
   return `<div class="ai-f ai-phone-wrap${cls}" style="display:flex;flex-direction:column;gap:4px">
     <div class="ai-phone-row">
       <input type="tel" class="ai-phone-input" placeholder="03XX-XXXXXXX" autocomplete="off" maxlength="40" value="${esc(p ? p.value : '')}" aria-label="Contact number"/>

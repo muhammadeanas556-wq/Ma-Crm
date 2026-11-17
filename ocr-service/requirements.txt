@@ -7,7 +7,9 @@ opencv-python-headless
 numpy
 pillow
 ultralytics
-rapidocr-onnxruntime
+rapidocr-onnxruntime  # still used by the bank-form template pipeline (/extract-text, /extract, /detect-signature) — unchanged
+paddleocr  # primary engine for /extract-text-generic (CRM parcel-screenshot OCR)
+paddlepaddle
 transformers<5  # microsoft/trocr-base-handwritten has no fast tokenizer.json; transformers 5.x dropped legacy slow-tokenizer conversion
 sentencepiece
 kagglehub

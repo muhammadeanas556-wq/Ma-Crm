@@ -56,7 +56,7 @@ const envInfo = { file: null, fromEnvVar: false, notes: [] };
   }
 })();
 const ai = require('./ai-import');
-const rapidocr = require('./rapidocr-provider');
+const paddleocr = require('./paddleocr-provider');
 const { createExtractionService } = require('./extraction-jobs');
 const phoneUtil   = require('./phone');
 const waSender    = require('./whatsapp-sender');
@@ -71,7 +71,7 @@ const GEMINI_KEYS = [GEMINI_API_KEY, ...['GEMINI_API_KEY_2', 'GEMINI_API_KEY_3']
 const NVIDIA_API_KEY = String(process.env.NVIDIA_API_KEY || '').replace(/^\uFEFF/, '').trim().replace(/^["']+|["']+$/g, '').split(/\s+/)[0] || '';
 const NVIDIA_MODEL = (process.env.NVIDIA_MODEL || 'nvidia/muse-glimmer-30b').trim();
 const NVIDIA_BASE_URL = (process.env.NVIDIA_BASE_URL || ai.NVIDIA_BASE_DEFAULT).trim();
-const AI_ENABLED = !!(GEMINI_KEYS.length || NVIDIA_API_KEY || rapidocr.RAPIDOCR_ENABLED);
+const AI_ENABLED = !!(GEMINI_KEYS.length || NVIDIA_API_KEY || paddleocr.PADDLEOCR_ENABLED);
 const GEMINI_MODEL   = (process.env.GEMINI_MODEL || 'gemini-3.8-flash').trim().replace(/^models\//, '');
 // Backup models used only when the main model is busy (HTTP 503 "high demand").
 // Stable (GA) models by default; override in .env with GEMINI_FALLBACK_MODELS=a,b
@@ -936,7 +936,7 @@ app.get('/api/ai/status', (req, res) => {
     maxImages: ai.LIMITS.MAX_IMAGES,
     reason: AI_ENABLED ? null : (envInfo.file || envInfo.fromEnvVar ? (keyCheck.problem || 'empty') : 'no_env_file'),
     health: aiHealth,
-    rapidocr: { enabled: rapidocr.RAPIDOCR_ENABLED, baseUrl: rapidocr.RAPIDOCR_BASE_URL },
+    paddleocr: { enabled: paddleocr.PADDLEOCR_ENABLED, baseUrl: paddleocr.PADDLEOCR_BASE_URL },
   });
 });
 
@@ -1089,11 +1089,11 @@ function aiKeepOrderFieldsOnly(draft) {
 // ── AI: EXTRACT — a cancellable JOB (saves nothing, never creates an order) ──
 //   POST /api/ai/extract            {jobId, images}  → starts the job, answers at once
 //   GET  /api/ai/extract/:id?rev=N                   → progress + (partial → final) draft
-//   POST /api/ai/extract/:id/cancel                  → aborts RapidOCR + Gemini, marks it cancelled
-// RapidOCR runs first (~4 s) and its result is published immediately; Gemini then verifies it
-// against the image. Hard limit for the whole job: 120 s (EXTRACT_HARD_LIMIT_MS).
+//   POST /api/ai/extract/:id/cancel                  → aborts PaddleOCR + Gemini, marks it cancelled
+// PaddleOCR runs first (hard cap: 60 s) and its result is published immediately; Gemini then
+// verifies it against the image. Hard limit for the whole job: 120 s (EXTRACT_HARD_LIMIT_MS).
 const extraction = createExtractionService({
-  ai, rapidocr,
+  ai, paddleocr,
   geminiAvailable: () => aiBuildChain().length > 0,
   callGemini: (opts, log, signal) => aiCallGeminiWithRetry({ apiKey: GEMINI_API_KEY, model: GEMINI_MODEL, ...opts }, log, signal),
   finalizeDraft: aiKeepOrderFieldsOnly,

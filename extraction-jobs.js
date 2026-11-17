@@ -2,23 +2,23 @@
 //  MA CRM — extraction-jobs.js
 //  Screenshot extraction as a cancellable JOB:
 //
-//    Step 1  RapidOCR  (target ~4 s)   → partial result is published immediately
-//    Step 2  Gemini    (gets the image + RapidOCR's text as a hint)
-//            → field-level merge with RapidOCR's result
-//    Hard cap: 120 s for the whole job (60 s RapidOCR + 60 s Gemini) (EXTRACT_HARD_LIMIT_MS)
+//    Step 1  PaddleOCR  (target ~4 s)   → partial result is published immediately
+//    Step 2  Gemini    (gets the image + PaddleOCR's text as a hint)
+//            → field-level merge with PaddleOCR's result
+//    Hard cap: 120 s for the whole job (60 s PaddleOCR + 60 s Gemini) (EXTRACT_HARD_LIMIT_MS)
 //
 //  Rules implemented here
 //   • Never reject an incomplete screenshot: whatever was read is returned, the rest stays blank.
-//   • Never invent values. If RapidOCR and Gemini disagree and neither reading can be verified
+//   • Never invent values. If PaddleOCR and Gemini disagree and neither reading can be verified
 //     (see resolveScalar), the field is left BLANK and reported in `engineConflicts`.
-//   • Cancellation: every job owns an AbortController that is passed to RapidOCR and Gemini
+//   • Cancellation: every job owns an AbortController that is passed to PaddleOCR and Gemini
 //     fetches and their retry sleeps. After cancel(), the pipeline cannot publish anything.
 //   • Nothing in this file touches the database. A job can never create an order.
 // ════════════════════════════════════════════════════════════
 const crypto = require('crypto');
 
 const HARD_LIMIT_MS   = Number(process.env.EXTRACT_HARD_LIMIT_MS) || 120000;   // whole job
-const GEMINI_WINDOW_MS = Number(process.env.GEMINI_WINDOW_MS) || 90000;       // Gemini's share
+const GEMINI_WINDOW_MS = Number(process.env.GEMINI_WINDOW_MS) || 60000;       // Gemini's share
 const KEEP_FINISHED_MS = 5 * 60 * 1000;                                       // result kept for polling
 const TOMBSTONE_MS     = 10 * 60 * 1000;                                      // "this id was cancelled"
 const JOB_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
@@ -47,7 +47,7 @@ function phoneKeysIn(text, phoneKey) {
   return out;
 }
 
-// ── FIELD-LEVEL MERGE (RapidOCR result × Gemini result) ─────
+// ── FIELD-LEVEL MERGE (PaddleOCR result × Gemini result) ─────
 // Both inputs are ai.validateParcel() outputs (or null when that engine gave nothing).
 // Returns the same shape, plus `engineConflicts: [{field,label,ocr,gemini}]`.
 //
@@ -92,7 +92,7 @@ function createMerger(ai) {
   function resolveScalar(key, a, b, text, conflicts) {
     const empty = { value: null, confidence: null, evidence: null };
     if (!has(a) && !has(b)) return { ...empty, evidence: (b && b.evidence) || (a && a.evidence) || null };
-    if (has(a) && !has(b)) return { ...a, confidence: a.confidence === 'high' ? 'medium' : a.confidence, engine: 'rapidocr' };   // single source → worth a look
+    if (has(a) && !has(b)) return { ...a, confidence: a.confidence === 'high' ? 'medium' : a.confidence, engine: 'paddleocr' };   // single source → worth a look
     if (!has(a) && has(b)) return { ...b, engine: 'gemini' };
     if (SAME[key](a.value, b.value)) {
       // keep Gemini's formatting (fuller name, spacing) — both engines agree, so confidence is high
@@ -102,28 +102,28 @@ function createMerger(ai) {
     // disagreement
     if (SUPPORTED[key](b.value, text)) return { ...b, confidence: 'medium', engine: 'gemini' };
     const aOk = VALID[key](a.value), bOk = VALID[key](b.value);
-    if (aOk && !bOk) return { ...a, confidence: 'low', engine: 'rapidocr' };
-    // OCR is a regex guess over (often garbled, esp. handwritten) text; Gemini actually looked at the image.
-    // If Gemini's value is well-formed, use it (flagged for review) instead of blanking the field.
-    if (bOk) return { ...b, confidence: 'low', engine: 'gemini' };
+    if (aOk && !bOk) return { ...a, confidence: 'low', engine: 'paddleocr' };
+    if (bOk && !aOk) return { ...b, confidence: 'low', engine: 'gemini' };
     conflicts.push({ field: key, label: LABEL[key], ocr: a.value, gemini: b.value });
-    return { value: null, confidence: null, evidence: `RapidOCR: "${String(a.value).slice(0, 40)}" / Gemini: "${String(b.value).slice(0, 40)}" — not verified`, engine: 'conflict' };
+    return { value: null, confidence: null, evidence: `PaddleOCR: "${String(a.value).slice(0, 40)}" / Gemini: "${String(b.value).slice(0, 40)}" — not verified`, engine: 'conflict' };
   }
 
   function resolvePhones(A, B, text, conflicts, unreadable) {
-    if (!B.length) return A.map(p => ({ ...p, engine: 'rapidocr', confidence: p.confidence === 'high' ? 'medium' : p.confidence }));
+    if (!B.length) return A.map(p => ({ ...p, engine: 'paddleocr', confidence: p.confidence === 'high' ? 'medium' : p.confidence }));
     if (!A.length) return B.map(p => ({ ...p, engine: 'gemini' }));
     if (A[0].key === B[0].key) return B.map((p, i) => ({ ...p, engine: i === 0 ? 'both' : 'gemini', confidence: i === 0 ? 'high' : p.confidence }));
     if (phoneKeysIn(text, ai.phoneKey).has(B[0].key)) return B.map(p => ({ ...p, engine: 'gemini', confidence: p.confidence === 'high' ? 'medium' : p.confidence }));
     const aOk = A[0].confidence !== 'low', bOk = B[0].confidence !== 'low';
-    if (aOk && !bOk) return [{ ...A[0], engine: 'rapidocr', confidence: 'low' }];
-    return B.map(p => ({ ...p, engine: 'gemini', confidence: 'low' }));   // Gemini read the image; keep its number, flagged
+    if (aOk && !bOk) return [{ ...A[0], engine: 'paddleocr', confidence: 'low' }];
+    if (bOk && !aOk) return B.map(p => ({ ...p, engine: 'gemini' }));
+    conflicts.push({ field: 'phone', label: LABEL.phone, ocr: A[0].value, gemini: B[0].value });
+    return [];
   }
 
   // ocrV / gemV: validateParcel() outputs or null
   function mergeEngines(ocrV, gemV, ocrText) {
     const conflicts = [];
-    if (ocrV && !gemV) return tag(ocrV, 'rapidocr', conflicts);
+    if (ocrV && !gemV) return tag(ocrV, 'paddleocr', conflicts);
     if (gemV && !ocrV) return tag(gemV, 'gemini', conflicts);
     if (!ocrV && !gemV) return null;
     const text = String(ocrText || '');
@@ -141,12 +141,12 @@ function createMerger(ai) {
     return out;
   }
   function tag(v, engine, conflicts) {
-    const mark = f => (has(f) ? { ...f, engine, confidence: engine === 'rapidocr' && f.confidence === 'high' ? 'medium' : f.confidence } : f);
+    const mark = f => (has(f) ? { ...f, engine, confidence: engine === 'paddleocr' && f.confidence === 'high' ? 'medium' : f.confidence } : f);
     return {
       ...v,
       client_name: mark(v.client_name), tracking_id: mark(v.tracking_id), cod_amount: mark(v.cod_amount),
       address: mark(v.address), product_name: mark(v.product_name),
-      phones: (v.phones || []).map(p => ({ ...p, engine, confidence: engine === 'rapidocr' && p.confidence === 'high' ? 'medium' : p.confidence })),
+      phones: (v.phones || []).map(p => ({ ...p, engine, confidence: engine === 'paddleocr' && p.confidence === 'high' ? 'medium' : p.confidence })),
       engineConflicts: conflicts,
     };
   }
@@ -241,9 +241,9 @@ function createJobManager() {
 }
 
 // ── PIPELINE ────────────────────────────────────────────────
-// deps: { ai, rapidocr, callGemini(opts, log, signal), geminiAvailable(), finalizeDraft(draft), log }
+// deps: { ai, paddleocr, callGemini(opts, log, signal), geminiAvailable(), finalizeDraft(draft), log }
 function createExtractionService(deps) {
-  const { ai, rapidocr, callGemini, geminiAvailable, finalizeDraft } = deps;
+  const { ai, paddleocr, callGemini, geminiAvailable, finalizeDraft } = deps;
   const log = deps.log || (() => {});
   const { mergeEngines } = createMerger(ai);
   const manager = createJobManager();
@@ -282,27 +282,26 @@ function createExtractionService(deps) {
       job.rev++;
     };
 
-    // ── Step 1: RapidOCR (hint only) — gets a short head start, never blocks Gemini for long ──
+    // ── Step 1: PaddleOCR ──
     const t0 = Date.now();
     let ocrText = '';
-    const OCR_GRACE_MS = Number(process.env.OCR_GRACE_MS) || 5000;
-    const ocrPromise = deps.rapidocr.runRapidOcr(image, { signal: job.ctrl.signal }).then(r => {
+    try {
+      const r = await deps.paddleocr.runPaddleOcr(image, { signal: job.ctrl.signal });
       ocrText = r.text || '';
       slot.ocr = ai.validateParcel(r.raw);
-      job.notes.rapidocr = `ok (${r.filled} field(s), ${Date.now() - t0}ms)`;
-      log(`${tag} RapidOCR ok — ${r.filled} field(s) in ${Date.now() - t0}ms`);
-    }).catch(e => {
+      job.notes.paddleocr = `ok (${r.filled} field(s), ${Date.now() - t0}ms)`;
+      log(`${tag} PaddleOCR ok — ${r.filled} field(s) in ${Date.now() - t0}ms`);
+    } catch (e) {
       if (job.state !== 'running' && job.cancelReason !== 'deadline') return;
-      job.notes.rapidocr = `failed: ${e.code || 'error'}`;
-      log(`${tag} RapidOCR unavailable (${e.code || 'error'}: ${e.message}) — going to Gemini`);
-    });
-    await Promise.race([ocrPromise, sleep(OCR_GRACE_MS, job.ctrl.signal)]);
+      job.notes.paddleocr = `failed: ${e.code || 'error'}`;
+      log(`${tag} PaddleOCR unavailable (${e.code || 'error'}: ${e.message}) — going straight to Gemini`);
+    }
     if (job.state !== 'running') return;
     job.stage = 'gemini';
     job.rev++;                                   // stage/notes changed -> make pollers re-read even if the draft is unchanged
     publish();                                   // ← usable partial result shown to the user right away
 
-    // ── Step 2: Gemini (image + RapidOCR text) ──
+    // ── Step 2: Gemini (image + PaddleOCR text) ──
     if (!geminiAvailable()) { job.notes.gemini = 'not configured'; slot.stage = 'done'; slot.final = slot.ocr ? mergeEngines(slot.ocr, null, ocrText) : null; publish(); return; }
     const g0 = Date.now();
     const win = withWindow(job.ctrl.signal, GEMINI_WINDOW_MS);
@@ -318,11 +317,10 @@ function createExtractionService(deps) {
       slot.errorCode = windowHit ? 'timeout' : (e.code || 'upstream');
       slot.error = e.message;
       if (e.code === 'config') job.error = { code: 'config', message: e.message };
-      log(`${tag} Gemini ${windowHit ? 'timed out' : 'failed'} (${e.code || 'error'}: ${e.message}) — keeping RapidOCR result`);
+      log(`${tag} Gemini ${windowHit ? 'timed out' : 'failed'} (${e.code || 'error'}: ${e.message}) — keeping PaddleOCR result`);
     } finally { win.done(); }
 
-    await Promise.race([ocrPromise, sleep(500, job.ctrl.signal)]);
-    // Merge whatever exists. RapidOCR's result is never discarded when Gemini fails.
+    // Merge whatever exists. PaddleOCR's result is never discarded when Gemini fails.
     slot.final = mergeEngines(slot.ocr, slot.gem, ocrText);
     slot.stage = 'done';
     if (job.state === 'running' || job.cancelReason === 'deadline') {
