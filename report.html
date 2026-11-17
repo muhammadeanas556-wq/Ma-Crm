@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="ur" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MA CRM — Monthly Report</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --border: #1e1e2e;
+    --accent: #6ee7b7;
+    --accent2: #f59e0b;
+    --accent3: #f87171;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --card: #13131f;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ─── */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 36px;
+    height: 36px;
+    background: var(--accent);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: #0a0a0f;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+  }
+
+  .logo-text {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
+  .logo-sub {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* ── CONTROLS ─── */
+  .controls {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .controls label {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  select, input[type="month"] {
+    background: var(--card);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 14px;
+    border-radius: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  select:hover, input[type="month"]:hover {
+    border-color: var(--accent);
+  }
+
+  .btn {
+    padding: 9px 20px;
+    border-radius: 6px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #0a0a0f;
+  }
+
+  .btn-primary:hover {
+    background: #a7f3d0;
+    transform: translateY(-1px);
+  }
+
+  .btn-pdf {
+    background: transparent;
+    border: 1px solid var(--accent2);
+    color: var(--accent2);
+  }
+
+  .btn-pdf:hover {
+    background: var(--accent2);
+    color: #0a0a0f;
+    transform: translateY(-1px);
+  }
+
+  /* ── MAIN CONTENT ─── */
+  .main {
+    padding: 28px 32px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  /* ── SUMMARY CARDS ─── */
+  .report-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    letter-spacing: -0.5px;
+  }
+
+  .report-sub {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    margin-bottom: 24px;
+  }
+
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 14px;
+    margin-bottom: 32px;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    transition: border-color 0.2s;
+  }
+
+  .card:hover { border-color: #2e2e42; }
+
+  .card-label {
+    font-size: 10px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 8px;
+  }
+
+  .card-value {
+    font-size: 26px;
+    font-weight: 700;
+    font-family: 'IBM Plex Mono', monospace;
+    line-height: 1;
+  }
+
+  .card-value.green  { color: var(--accent); }
+  .card-value.amber  { color: var(--accent2); }
+  .card-value.red    { color: var(--accent3); }
+  .card-value.blue   { color: #93c5fd; }
+  .card-value.purple { color: #c084fc; }
+
+  .card-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* ── SECTION ─── */
+  .section {
+    margin-bottom: 32px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .section-title {
+    font-size: 14px;
+    font-weight: 600;
+    font-family: 'IBM Plex Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .section-count {
+    background: var(--border);
+    color: var(--muted);
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* ── TABLE ─── */
+  .table-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  thead tr {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  th {
+    padding: 11px 16px;
+    text-align: left;
+    font-size: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 11px 16px;
+    border-bottom: 1px solid #0f0f1a;
+    vertical-align: middle;
+  }
+
+  tbody tr:hover { background: rgba(255,255,255,0.02); }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: 'IBM Plex Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .badge-processing { background: rgba(251,191,36,0.12); color: #fbbf24; }
+  .badge-delivered  { background: rgba(110,231,183,0.12); color: var(--accent); }
+  .badge-cancelled  { background: rgba(248,113,113,0.12); color: var(--accent3); }
+
+  .amount { font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+  .amount.positive { color: var(--accent); }
+  .amount.negative { color: var(--accent3); }
+
+  .id-cell {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* ── EMPTY ─── */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+
+  .empty-icon { font-size: 40px; margin-bottom: 12px; }
+  .empty-title { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  .empty-sub { font-size: 13px; }
+
+  /* ── LOADING ─── */
+  .loading {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-right: 10px;
+    vertical-align: middle;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── TOAST ─── */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .toast.show { opacity: 1; }
+
+  /* ── SERVER NOTE ─── */
+  .server-note {
+    background: rgba(110,231,183,0.06);
+    border: 1px solid rgba(110,231,183,0.2);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--accent);
+    margin-bottom: 24px;
+    display: none;
+  }
+
+  .server-note.show { display: block; }
+
+  @media (max-width: 640px) {
+    .header, .controls, .main { padding-left: 16px; padding-right: 16px; }
+    .cards-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="logo">
+    <div class="logo-icon">MA</div>
+    <div>
+      <div class="logo-text">MA CRM</div>
+      <div class="logo-sub">Monthly Report</div>
+    </div>
+  </div>
+  <div>
+    <span id="serverStatus" style="font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--muted);">● connecting...</span>
+  </div>
+</header>
+
+<!-- CONTROLS -->
+<div class="controls">
+  <label>Month:</label>
+  <input type="month" id="monthPicker" />
+
+  <button class="btn btn-primary" onclick="loadReport()">Load Report</button>
+  <button class="btn btn-pdf" id="pdfBtn" onclick="downloadPDF()">⬇ Download PDF</button>
+
+  <span id="loadingIndicator" style="display:none;font-size:12px;color:var(--muted);font-family:'IBM Plex Mono',monospace;">
+    <span class="spinner"></span>Loading...
+  </span>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <div class="server-note" id="serverNote">
+    ⚠️ Server connect nahi hua (localhost:3000). Demo data dikh raha hai.
+    Node.js server chalao: <strong>node server.js</strong>
+  </div>
+
+  <div id="reportContent">
+    <div class="empty-state">
+      <div class="empty-icon">📊</div>
+      <div class="empty-title">Monthly Report</div>
+      <div class="empty-sub">Upar se month select karo aur "Load Report" dabao</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  CONFIG
+// ════════════════════════════════════════════════════════════
+const API_BASE = window.location.origin;
+const COMPANY_NAME = 'MA CRM';
+
+// Set default month to current and auto-load
+const now = new Date();
+document.getElementById('monthPicker').value =
+  `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+// Auto-load current month report on page open
+window.addEventListener('load', () => loadReport());
+
+// ── Month name helper ───────────────────────────────────────
+const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June',
+                     'July', 'August', 'September', 'October', 'November', 'December'];
+
+// ── Current report data (for PDF) ──────────────────────────
+let currentReport = null;
+
+// ════════════════════════════════════════════════════════════
+//  SERVER HEALTH CHECK
+// ════════════════════════════════════════════════════════════
+async function checkServer() {
+  try {
+    const r = await fetch(`${API_BASE}/api/health`, { signal: AbortSignal.timeout(3000) });
+    const d = await r.json();
+    if (d.success) {
+      document.getElementById('serverStatus').innerHTML =
+        '● <span style="color:var(--accent)">server online</span>';
+    }
+  } catch {
+    document.getElementById('serverStatus').innerHTML =
+      '● <span style="color:var(--accent3)">server offline</span>';
+  }
+}
+checkServer();
+
+// ════════════════════════════════════════════════════════════
+//  LOAD REPORT
+// ════════════════════════════════════════════════════════════
+async function loadReport() {
+  const monthVal = document.getElementById('monthPicker').value; // "2026-05"
+  if (!monthVal) { showToast('Month select karo pehle'); return; }
+
+  const [year, month] = monthVal.split('-').map(Number);
+
+  document.getElementById('loadingIndicator').style.display = 'inline-flex';
+  document.getElementById('reportContent').innerHTML =
+    '<div class="loading"><span class="spinner"></span> Report load ho rahi hai...</div>';
+
+  try {
+    const r = await fetch(`${API_BASE}/api/report/${year}/${month}`);
+    const data = await r.json();
+
+    if (!data.success) throw new Error(data.message);
+
+    document.getElementById('serverNote').classList.remove('show');
+    currentReport = { ...data, year, month };
+    renderReport(data, year, month);
+
+  } catch (err) {
+    console.warn('Could not load report:', err.message);
+    document.getElementById('serverNote').classList.add('show');
+    document.getElementById('serverNote').textContent = 'Unable to load report. Sign in to MA CRM and check your connection.';
+    currentReport = null;
+    document.getElementById('reportContent').innerHTML = '<div class="empty-state">Report unavailable. No sample figures are shown.</div>';
+  }
+
+  document.getElementById('loadingIndicator').style.display = 'none';
+}
+
+// ════════════════════════════════════════════════════════════
+//  RENDER
+// ════════════════════════════════════════════════════════════
+function renderReport(data, year, month) {
+  const { summary, orders, clients } = data;
+  const monthName = MONTH_NAMES[month];
+  const rs = n => `Rs. ${Number(n || 0).toLocaleString()}`;
+
+  const html = `
+    <div class="report-title">${monthName} ${year} — Monthly Report</div>
+    <div class="report-sub">Generated: ${new Date().toLocaleString('en-PK')} &nbsp;|&nbsp; Orders: ${summary.totalOrders || 0}</div>
+
+    <!-- SUMMARY CARDS -->
+    <div class="cards-grid">
+      <div class="card">
+        <div class="card-label">Total Orders</div>
+        <div class="card-value blue">${summary.totalOrders || 0}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Total Clients</div>
+        <div class="card-value purple">${summary.totalClients || 0}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Delivered</div>
+        <div class="card-value green">${summary.delivered || 0}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Processing</div>
+        <div class="card-value amber">${summary.processing || 0}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Cancelled</div>
+        <div class="card-value red">${summary.cancelled || 0}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Total Revenue</div>
+        <div class="card-value green" style="font-size:20px">${rs(summary.totalRevenue)}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Received</div>
+        <div class="card-value green" style="font-size:20px">${rs(summary.received)}</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Pending</div>
+        <div class="card-value red" style="font-size:20px">${rs(summary.pending)}</div>
+      </div>
+    </div>
+
+    <!-- ORDERS TABLE -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">Orders</span>
+        <span class="section-count">${orders.length}</span>
+      </div>
+      <div class="table-wrap">
+        ${orders.length === 0 ? '<div class="empty-state"><div class="empty-sub">Is month koi order nahi</div></div>' : `
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Client</th>
+              <th>Phone</th>
+              <th>Product</th>
+              <th>Status</th>
+              <th>Amount</th>
+              <th>Paid</th>
+              <th>Remaining</th>
+              <th>Date</th>
+              <th>Staff</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${orders.map(o => `
+              <tr>
+                <td class="id-cell">#${o.id}</td>
+                <td><strong>${esc(o.clientName)}</strong></td>
+                <td class="id-cell">${esc(o.phone)}</td>
+                <td style="color:var(--muted);font-size:12px">${esc(o.product) || '—'}</td>
+                <td><span class="badge badge-${(o.status || '').toLowerCase()}">${esc(o.status)}</span></td>
+                <td class="amount">${rs(o.amount)}</td>
+                <td class="amount positive">${rs(o.paid)}</td>
+                <td class="amount ${o.remaining > 0 ? 'negative' : ''}">${rs(o.remaining)}</td>
+                <td class="id-cell" style="white-space:nowrap">${esc(o.date)}</td>
+                <td style="font-size:12px;color:var(--muted)">${esc(o.assignedTo) || '—'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>`}
+      </div>
+    </div>
+
+    <!-- CLIENTS TABLE -->
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">Clients</span>
+        <span class="section-count">${clients.length}</span>
+      </div>
+      <div class="table-wrap">
+        ${clients.length === 0 ? '<div class="empty-state"><div class="empty-sub">Is month koi client nahi</div></div>' : `
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Name</th>
+              <th>Phone</th>
+              <th>Orders</th>
+              <th>Total Spend</th>
+              <th>Paid</th>
+              <th>Pending</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${clients.map((c, i) => `
+              <tr>
+                <td class="id-cell">${i + 1}</td>
+                <td><strong>${esc(c.clientName)}</strong></td>
+                <td class="id-cell">${esc(c.phone)}</td>
+                <td style="text-align:center;font-family:'IBM Plex Mono',monospace">${c.totalOrders}</td>
+                <td class="amount">${rs(c.totalSpend)}</td>
+                <td class="amount positive">${rs(c.totalPaid)}</td>
+                <td class="amount ${c.totalPending > 0 ? 'negative' : ''}">${rs(c.totalPending)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>`}
+      </div>
+    </div>
+  `;
+
+  document.getElementById('reportContent').innerHTML = html;
+}
+
+// ════════════════════════════════════════════════════════════
+//  PDF DOWNLOAD
+// ════════════════════════════════════════════════════════════
+function downloadPDF() {
+  if (!currentReport) { showToast('Pehle report load karo'); return; }
+
+  const { summary, orders, clients, year, month } = currentReport;
+  const monthName = MONTH_NAMES[month];
+  const rs = n => `Rs. ${Number(n || 0).toLocaleString()}`;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  const W = 210;
+  let y = 0;
+
+  // ── Header Band ─────────────────────────────────────────
+  doc.setFillColor(16, 185, 129); // accent green
+  doc.rect(0, 0, W, 28, 'F');
+
+  doc.setTextColor(10, 10, 15);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text('MA CRM', 14, 16);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text('Monthly Business Report', 14, 23);
+
+  // Right side: month + date
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  const titleStr = `${monthName} ${year}`;
+  doc.text(titleStr, W - 14, 14, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text(`Generated: ${new Date().toLocaleString('en-PK')}`, W - 14, 21, { align: 'right' });
+
+  y = 36;
+
+  // ── Summary Cards ────────────────────────────────────────
+  const cards = [
+    { label: 'Total Orders',   value: summary.totalOrders || 0,         color: [147, 197, 253] },
+    { label: 'Delivered',      value: summary.delivered || 0,            color: [110, 231, 183] },
+    { label: 'Cancelled',      value: summary.cancelled || 0,            color: [248, 113, 113] },
+    { label: 'Total Revenue',  value: rs(summary.totalRevenue),          color: [110, 231, 183] },
+    { label: 'Received',       value: rs(summary.received),              color: [110, 231, 183] },
+    { label: 'Pending',        value: rs(summary.pending),               color: [248, 113, 113] },
+  ];
+
+  const cardW = 58;
+  const cardH = 20;
+  const cardGap = 8;
+  const startX = 14;
+  let cx = startX;
+  let cy = y;
+  let col = 0;
+
+  cards.forEach((card, i) => {
+    doc.setFillColor(19, 19, 31);
+    doc.roundedRect(cx, cy, cardW, cardH, 3, 3, 'F');
+    doc.setTextColor(...card.color);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text(String(card.value), cx + cardW / 2, cy + 11, { align: 'center' });
+    doc.setTextColor(100, 116, 139);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.text(card.label.toUpperCase(), cx + cardW / 2, cy + 17, { align: 'center' });
+
+    col++;
+    cx += cardW + cardGap;
+    if (col >= 3) { col = 0; cx = startX; cy += cardH + 6; }
+  });
+
+  y = cy + cardH + 14;
+
+  // ── Orders Table ─────────────────────────────────────────
+  doc.setTextColor(226, 232, 240);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text(`Orders (${orders.length})`, 14, y);
+  y += 4;
+
+  doc.autoTable({
+    startY: y,
+    head: [['#', 'Client', 'Phone', 'Product', 'Status', 'Amount', 'Paid', 'Remaining', 'Date']],
+    body: orders.map(o => [
+      `#${o.id}`,
+      o.clientName || '',
+      o.phone || '',
+      o.product || '—',
+      o.status || '',
+      rs(o.amount),
+      rs(o.paid),
+      rs(o.remaining),
+      o.date || '',
+    ]),
+    styles: {
+      font: 'helvetica',
+      fontSize: 7,
+      cellPadding: 3,
+      fillColor: [19, 19, 31],
+      textColor: [226, 232, 240],
+      lineColor: [30, 30, 46],
+      lineWidth: 0.1,
+    },
+    headStyles: {
+      fillColor: [17, 17, 24],
+      textColor: [100, 116, 139],
+      fontSize: 6.5,
+      fontStyle: 'bold',
+    },
+    alternateRowStyles: { fillColor: [15, 15, 26] },
+    columnStyles: {
+      0: { cellWidth: 10, textColor: [100, 116, 139] },
+      4: { cellWidth: 20 },
+      5: { textColor: [110, 231, 183] },
+      7: { textColor: [248, 113, 113] },
+    },
+    margin: { left: 14, right: 14 },
+    didParseCell: function(data) {
+      if (data.section === 'body' && data.column.index === 4) {
+        const s = (data.cell.raw || '').toLowerCase();
+        if (s === 'delivered') data.cell.styles.textColor = [110, 231, 183];
+        else if (s === 'cancelled') data.cell.styles.textColor = [248, 113, 113];
+        else data.cell.styles.textColor = [251, 191, 36];
+      }
+    }
+  });
+
+  y = doc.lastAutoTable.finalY + 10;
+
+  // ── Clients Table ─────────────────────────────────────────
+  doc.setTextColor(226, 232, 240);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text(`Clients (${clients.length})`, 14, y);
+  y += 4;
+
+  doc.autoTable({
+    startY: y,
+    head: [['#', 'Name', 'Phone', 'Orders', 'Total Spend', 'Paid', 'Pending']],
+    body: clients.map((c, i) => [
+      i + 1,
+      c.clientName || '',
+      c.phone || '',
+      c.totalOrders,
+      rs(c.totalSpend),
+      rs(c.totalPaid),
+      rs(c.totalPending),
+    ]),
+    styles: {
+      font: 'helvetica',
+      fontSize: 7.5,
+      cellPadding: 3.5,
+      fillColor: [19, 19, 31],
+      textColor: [226, 232, 240],
+      lineColor: [30, 30, 46],
+      lineWidth: 0.1,
+    },
+    headStyles: {
+      fillColor: [17, 17, 24],
+      textColor: [100, 116, 139],
+      fontSize: 7,
+      fontStyle: 'bold',
+    },
+    alternateRowStyles: { fillColor: [15, 15, 26] },
+    columnStyles: {
+      0: { cellWidth: 10, textColor: [100, 116, 139] },
+      3: { halign: 'center' },
+      4: { textColor: [226, 232, 240] },
+      5: { textColor: [110, 231, 183] },
+      6: { textColor: [248, 113, 113] },
+    },
+    margin: { left: 14, right: 14 },
+  });
+
+  // ── Footer ───────────────────────────────────────────────
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFillColor(17, 17, 24);
+    doc.rect(0, 285, W, 12, 'F');
+    doc.setTextColor(100, 116, 139);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.text('MA CRM — Confidential Business Report', 14, 292);
+    doc.text(`Page ${i} of ${pageCount}`, W - 14, 292, { align: 'right' });
+  }
+
+  // ── Save ─────────────────────────────────────────────────
+  const filename = `MA-CRM-Report-${monthName}-${year}.pdf`;
+  doc.save(filename);
+  showToast(`✅ ${filename} download ho raha hai`);
+}
+
+// ════════════════════════════════════════════════════════════
+//  DEMO DATA (when server is offline)
+// ════════════════════════════════════════════════════════════
+function getDemoData(year, month) {
+  return {
+    summary: {
+      totalOrders: 22, totalClients: 18,
+      delivered: 8, processing: 14, cancelled: 0,
+      totalRevenue: 52800, received: 2400, pending: 50400
+    },
+    orders: [
+      { id:1,  clientName:'Shaik Haris',   phone:'3137236143', product:'Height Grow x 2', status:'Processing', amount:3000, paid:0,   remaining:3000, date:'12 May 2026', assignedTo:'Muhammad Anas' },
+      { id:2,  clientName:'Irshadahmed',   phone:'3710789457', product:'Height Grow x 2', status:'Processing', amount:3000, paid:0,   remaining:3000, date:'12 May 2026', assignedTo:'Muhammad Anas' },
+      { id:3,  clientName:'Vishal ali',    phone:'3477364235', product:'Height Grow x 1', status:'Processing', amount:1600, paid:0,   remaining:1600, date:'12 May 2026', assignedTo:'Muhammad Anas' },
+      { id:4,  clientName:'Ali Raza',      phone:'3107852809', product:'Height Grow x 1', status:'Delivered',  amount:1600, paid:1600,remaining:0,    date:'12 May 2026', assignedTo:'Muhammad Anas' },
+      { id:5,  clientName:'Fasil',         phone:'3206241713', product:'Height Grow x 1', status:'Delivered',  amount:1600, paid:800, remaining:800,  date:'12 May 2026', assignedTo:'Muhammad Anas' },
+    ],
+    clients: [
+      { clientName:'Shaik Haris',   phone:'3137236143', totalOrders:1, totalSpend:3000, totalPaid:0,    totalPending:3000 },
+      { clientName:'Irshadahmed',   phone:'3710789457', totalOrders:1, totalSpend:3000, totalPaid:0,    totalPending:3000 },
+      { clientName:'Ali Raza',      phone:'3107852809', totalOrders:1, totalSpend:1600, totalPaid:1600, totalPending:0    },
+      { clientName:'Vishal ali',    phone:'3477364235', totalOrders:1, totalSpend:1600, totalPaid:0,    totalPending:1600 },
+      { clientName:'Fasil',         phone:'3206241713', totalOrders:1, totalSpend:1600, totalPaid:800,  totalPending:800  },
+    ]
+  };
+}
+
+// ════════════════════════════════════════════════════════════
+//  UTILS
+// ════════════════════════════════════════════════════════════
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>

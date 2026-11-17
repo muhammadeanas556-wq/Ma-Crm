@@ -18,7 +18,7 @@
 const crypto = require('crypto');
 
 const HARD_LIMIT_MS   = Number(process.env.EXTRACT_HARD_LIMIT_MS) || 120000;   // whole job
-const GEMINI_WINDOW_MS = Number(process.env.GEMINI_WINDOW_MS) || 60000;       // Gemini's share
+const GEMINI_WINDOW_MS = Number(process.env.GEMINI_WINDOW_MS) || 90000;       // Gemini's share
 const KEEP_FINISHED_MS = 5 * 60 * 1000;                                       // result kept for polling
 const TOMBSTONE_MS     = 10 * 60 * 1000;                                      // "this id was cancelled"
 const JOB_ID_RE = /^[A-Za-z0-9_-]{8,64}$/;
@@ -103,7 +103,9 @@ function createMerger(ai) {
     if (SUPPORTED[key](b.value, text)) return { ...b, confidence: 'medium', engine: 'gemini' };
     const aOk = VALID[key](a.value), bOk = VALID[key](b.value);
     if (aOk && !bOk) return { ...a, confidence: 'low', engine: 'rapidocr' };
-    if (bOk && !aOk) return { ...b, confidence: 'low', engine: 'gemini' };
+    // OCR is a regex guess over (often garbled, esp. handwritten) text; Gemini actually looked at the image.
+    // If Gemini's value is well-formed, use it (flagged for review) instead of blanking the field.
+    if (bOk) return { ...b, confidence: 'low', engine: 'gemini' };
     conflicts.push({ field: key, label: LABEL[key], ocr: a.value, gemini: b.value });
     return { value: null, confidence: null, evidence: `RapidOCR: "${String(a.value).slice(0, 40)}" / Gemini: "${String(b.value).slice(0, 40)}" — not verified`, engine: 'conflict' };
   }
@@ -115,9 +117,7 @@ function createMerger(ai) {
     if (phoneKeysIn(text, ai.phoneKey).has(B[0].key)) return B.map(p => ({ ...p, engine: 'gemini', confidence: p.confidence === 'high' ? 'medium' : p.confidence }));
     const aOk = A[0].confidence !== 'low', bOk = B[0].confidence !== 'low';
     if (aOk && !bOk) return [{ ...A[0], engine: 'rapidocr', confidence: 'low' }];
-    if (bOk && !aOk) return B.map(p => ({ ...p, engine: 'gemini' }));
-    conflicts.push({ field: 'phone', label: LABEL.phone, ocr: A[0].value, gemini: B[0].value });
-    return [];
+    return B.map(p => ({ ...p, engine: 'gemini', confidence: 'low' }));   // Gemini read the image; keep its number, flagged
   }
 
   // ocrV / gemV: validateParcel() outputs or null
@@ -282,20 +282,21 @@ function createExtractionService(deps) {
       job.rev++;
     };
 
-    // ── Step 1: RapidOCR ──
+    // ── Step 1: RapidOCR (hint only) — gets a short head start, never blocks Gemini for long ──
     const t0 = Date.now();
     let ocrText = '';
-    try {
-      const r = await deps.rapidocr.runRapidOcr(image, { signal: job.ctrl.signal });
+    const OCR_GRACE_MS = Number(process.env.OCR_GRACE_MS) || 5000;
+    const ocrPromise = deps.rapidocr.runRapidOcr(image, { signal: job.ctrl.signal }).then(r => {
       ocrText = r.text || '';
       slot.ocr = ai.validateParcel(r.raw);
       job.notes.rapidocr = `ok (${r.filled} field(s), ${Date.now() - t0}ms)`;
       log(`${tag} RapidOCR ok — ${r.filled} field(s) in ${Date.now() - t0}ms`);
-    } catch (e) {
+    }).catch(e => {
       if (job.state !== 'running' && job.cancelReason !== 'deadline') return;
       job.notes.rapidocr = `failed: ${e.code || 'error'}`;
-      log(`${tag} RapidOCR unavailable (${e.code || 'error'}: ${e.message}) — going straight to Gemini`);
-    }
+      log(`${tag} RapidOCR unavailable (${e.code || 'error'}: ${e.message}) — going to Gemini`);
+    });
+    await Promise.race([ocrPromise, sleep(OCR_GRACE_MS, job.ctrl.signal)]);
     if (job.state !== 'running') return;
     job.stage = 'gemini';
     job.rev++;                                   // stage/notes changed -> make pollers re-read even if the draft is unchanged
@@ -320,6 +321,7 @@ function createExtractionService(deps) {
       log(`${tag} Gemini ${windowHit ? 'timed out' : 'failed'} (${e.code || 'error'}: ${e.message}) — keeping RapidOCR result`);
     } finally { win.done(); }
 
+    await Promise.race([ocrPromise, sleep(500, job.ctrl.signal)]);
     // Merge whatever exists. RapidOCR's result is never discarded when Gemini fails.
     slot.final = mergeEngines(slot.ocr, slot.gem, ocrText);
     slot.stage = 'done';
